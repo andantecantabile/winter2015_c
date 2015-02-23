@@ -19,13 +19,17 @@
 #define TF_WRITE 1
 #define TF_FETCH 2
 
+// BRANCH TYPE PARAMETERS:
+#define BT_UNCONDITIONAL 0
+#define BT_CONDITIONAL   1
+
 // ARCHITECTURE PARAMETERS
 //-------------------------
 // PDP-8 ARCHITECTURE SPECIFICATIONS:
 // Note: Since these are fixed for the PDP-8 architecture,
 //       these numbers were hard-coded in rather than calculating
 //       some values relative to others.  
-//         i.e. ADDR_PAGE_HIGH is actually log2(PDP8_PAGE_NUM)
+//         i.e. ADDR_PAGE_HIGH + 1 is actually log2(PDP8_PAGE_NUM)
 #define PDP8_WORD_SIZE 12		// size of words in memory in bits
 #define PDP8_WORDS_PER_PAGE 128 // number of words per page
 #define PDP8_PAGE_NUM 32		// number of "pages"
@@ -49,8 +53,8 @@
 #define ADDR_MEMORY_PAGE_BIT 4
 
 // Instruction Opcode Indices:
-#define INSTR_OP_LOW 0
-#define INSTR_OP_HIGH 2
+#define INSTR_OP_HIGH 0
+#define INSTR_OP_LOW 2
 
 // OPCODE NUMBERS:
 #define	OP_AND 0
@@ -80,6 +84,13 @@ typedef struct _mem_word {
 	char valid; 		// "valid bit" indicating if the data is valid
 } s_mem_word;
 
+// STRUCT definition for return values from effective address module
+typedef struct _effective_addr {
+	short int EAddr;	// Effective Address 
+	char flag_MemType_Indirect;		// flag for indirect memory reference
+	char flag_MemType_AutoIndex;	// flag for autoindex memory reference
+} s_effective_addr;
+
 // STRUCT definition for return values from modules
 typedef struct _updated_vals {
 	short int PC;	// Program Counter [0:11]
@@ -92,7 +103,7 @@ typedef struct _updated_vals {
 	char flag_GRP2_SKP_UNCOND;	// set to 1 if the SKIP ALL grp 2 micro instruction was given
 	char flag_GRP2_SKP;		// set to 1 if any other skip grp 2 microinstruction was given.
 	char flag_branch_taken;	// set to 1 if a branch was taken
-} updated_vals;
+} s_updated_vals;
 
 // STRUCT definition for debug flags
 typedef struct _debug_flags {
@@ -101,12 +112,58 @@ typedef struct _debug_flags {
 	int module;		// 1 = TURN ON DEBUG PRINTS IN MODULES; 0 = NORMAL OPERATION
 	int eaddr;			// 1 = TURN ON DEBUG PRINTS IN EFFECTIVE ADDRESS CALCULATION; 0 = NORMAL OP
 	int short_mode;	// short debug print mode
-} debug_flags;
+} s_debug_flags;
+
+// STRUCT definition for branch statistics
+typedef struct _branch_stats {
+	int ISZ_t_count;			// number of ISZ branches taken
+	int JMS_t_count;			// number of JMS branches taken (unconditional)
+	int JMP_t_count;			// number of JMP branches taken (unconditional)
+	int UI_cond_t_count;		// number of UI conditional branches taken
+	int UI_uncond_t_count;	// number of UI unconditional (SKP) branches taken
+	int ISZ_nt_count;			// number of ISZ branches NOT taken
+	//int JMS_nt_count;			// number of JMS branches NOT taken
+	//int JMP_nt_count;			// number of JMP branches NOT taken
+	int UI_cond_nt_count;		// number of UI conditional branches NOT taken
+	int UI_uncond_nt_count;	// number of UI unconditional (SKP) branches NOT taken
+} s_branch_stats;
 
 //---------------------------	
 // END STRUCT DEFINITIONS
 //=========================================================
 
+
+//=========================================================
+// FUNCTION NAME: int_to_binary_str
+// Description: For a given int, returns a binary string.
+// Parameters: Integer to be converted to binary, the
+//    maximum number of characters to be returned, and 
+//    pointer to the string to be written to.
+// Return Value: No direct return value; the binary string
+//    is returned by reference in the argument list.
+//---------------------------------------------------------	
+void int_to_binary_str(int x, int max_digits, char* str_binary)
+{
+	// y is a comparison value, initialized to the integer
+	// number that has a '1' in the most significant bit
+	// position, with all following bits as '0'.
+	//int y = 2^(max_digits-1);
+	int y = 1 << (max_digits-1);
+	int i = 0; // offset into the char[] array
+
+	if (max_digits > 0) {
+		for (; y > 0; y = y >> 1)
+		{
+			if ((x & y) == y) {
+				*(str_binary+i) = '1';
+			}
+			else {
+				*(str_binary+i) = '0';
+			}
+			i++; // increment the array position
+		}
+	}
+}
 
 
 //=========================================================
@@ -200,7 +257,7 @@ void load_memory_array(s_mem_word* ptr_mem_array, char* input_filename, char DEB
 			(ptr_mem_array+curr_addr)->value = curr_data;
 			(ptr_mem_array+curr_addr)->valid = 1;
 
-//				if(DEBUG_MEM_DISPLAY) $display("Address: %3x [%4o] Value: %x [%o]", curr_addr, curr_addr, curr_data,curr_data);
+//				if(DEBUG_MEM_DISPLAY) printf("Address: %3x [%4o] Value: %x [%o]", curr_addr, curr_addr, curr_data,curr_data);
 
 			// increment the current address
 			curr_addr = curr_addr + 1;
@@ -239,7 +296,7 @@ void load_memory_array(s_mem_word* ptr_mem_array, char* input_filename, char DEB
 //    of the param file.
 // Return Value: none.
 //---------------------------------------------------------	
-void read_param_file(debug_flags* ptr_debug, char* param_filename)
+void read_param_file(s_debug_flags* ptr_debug, char* param_filename)
 {
 	FILE* fp_paramfile;	// file handle for param file
 	char c;
@@ -278,29 +335,53 @@ void read_param_file(debug_flags* ptr_debug, char* param_filename)
 //    if branch was taken, flag indicating type of branch.
 // Return Value: none.
 //---------------------------------------------------------	
-void write_branch_trace(FILE* fp_branchtrace, short int PC, char opcode, short int target_address, char flag_branch_taken, char flag_branch_type) {
+void write_branch_trace(FILE* fp_branchtrace, short int PC, char opcode, short int target_address, 
+	char flag_branch_taken, char flag_branch_type, s_branch_stats* branch_stats) {
 	// Append PC, opcode (branch type), Branch T/NT, and target address in trace file
 	switch (opcode) {
 		case OP_ISZ:
-			if (flag_branch_taken)
+			if (flag_branch_taken) {
 				fprintf(fp_branchtrace, "%x [%o]    ISZ           TAKEN              %x [%o]\n", PC, PC, target_address, target_address);
-			else
+				(branch_stats->ISZ_t_count)++;
+			}
+			else {
 				fprintf(fp_branchtrace, "%x [%o]    ISZ           NOT TAKEN          %x [%o]\n", PC, PC, target_address, target_address);
+				(branch_stats->ISZ_nt_count)++;
+			}
 			break;
 		
 		case OP_JMS:
 			fprintf(fp_branchtrace, "%x [%o]    JMS           TAKEN              %x [%o]\n", PC, PC, target_address, target_address);
+			(branch_stats->JMS_t_count)++;
 			break;
 		
 		case OP_JMP:
 			fprintf(fp_branchtrace, "%x [%o]    JMP           TAKEN              %x [%o]\n", PC, PC, target_address, target_address);
+			(branch_stats->JMP_t_count)++;
 			break;
 			
 		case OP_UI:
-			if (flag_branch_taken)
-				fprintf(fp_branchtrace, "%x [%o]    MICRO_OPS     TAKEN              %x [%o]\n", PC, PC, target_address, target_address);
+			if (flag_branch_type == BT_UNCONDITIONAL) {
+				if (flag_branch_taken) {
+					fprintf(fp_branchtrace, "%x [%o]    MICRO_OP-SKP  TAKEN              %x [%o]\n", PC, PC, target_address, target_address);
+					(branch_stats->UI_uncond_t_count)++;
+				}
+				else {
+					fprintf(fp_branchtrace, "%x [%o]    MICRO_OP-SKP  NOT TAKEN          %x [%o]\n", PC, PC, target_address, target_address);
+					(branch_stats->UI_uncond_nt_count)++; // NOTE: This should never be incremented. If it is, there is an error somewhere!
+				}
+			}
 			else
-				fprintf(fp_branchtrace, "%x [%o]    MICRO_OPS     NOT TAKEN          %x [%o]\n", PC, PC, target_address, target_address);
+			{
+				if (flag_branch_taken) {
+					fprintf(fp_branchtrace, "%x [%o]    MICRO_OPS     TAKEN              %x [%o]\n", PC, PC, target_address, target_address);
+					(branch_stats->UI_cond_t_count)++;
+				}
+				else {
+					fprintf(fp_branchtrace, "%x [%o]    MICRO_OPS     NOT TAKEN          %x [%o]\n", PC, PC, target_address, target_address);
+					(branch_stats->UI_cond_nt_count)++;
+				}
+			}
 			break;
 	}
 }
@@ -315,14 +396,14 @@ void write_branch_trace(FILE* fp_branchtrace, short int PC, char opcode, short i
 // READ FROM MEMORY FUNCTION
 //---------------------------------------------------------	
 // Function: read_mem
-// Description: Given an address and a value, read the
-//   given value at the index in the mem_array specified
-//   by the given address.  Note that the valid bit for 
+// Description: Given an address, read the word located
+//   at the index in the mem_array specified by the
+//   given address.  Note that the valid bit for 
 //   the specified memory address must also be set.
 //   Also must be given a flag for the type of read that 
 //   is occurring.
 //---------------------------------------------------------
-short int read_mem(FILE* fp_tracefile, s_mem_word* ptr_mem_array, short int address, short int value, char read_type) {
+short int read_mem(short int address, char read_type, s_mem_word* ptr_mem_array, FILE* fp_tracefile) {
 	// Append current read_type and address in trace file
 	// Note, "read_type" input should be either "TF_READ" or "TF_FETCH".
 	
@@ -353,7 +434,7 @@ short int read_mem(FILE* fp_tracefile, s_mem_word* ptr_mem_array, short int addr
 //   by the given address.  Note that the valid bit for 
 //   the specified memory address must also be set.
 //---------------------------------------------------------
-void write_mem(FILE* fp_tracefile, s_mem_word* ptr_mem_array, short int address, short int value) {
+void write_mem(short int address, short int value, s_mem_word* ptr_mem_array, FILE* fp_tracefile) {
 	// Append current opcode and address in trace file
 	// Note, no "opcode" input, because there is only one WRITE option.
 	fprintf(fp_tracefile, "%d %x\n", TF_WRITE, address);
@@ -377,186 +458,243 @@ void write_mem(FILE* fp_tracefile, s_mem_word* ptr_mem_array, short int address,
 //=========================================================
 
 
-
-/*
-	//--------------------------------------------------------------------	
-	// Calculate next Effective Address:
-	//------------------------------------
-	// Calculate the effective address for memory reference 
-	// instructions (opcodes 0 - 5).  Note that these 
-	// instructions are specified as follows:
-	//          0   1   2   3   4   5   6   7   8   9  10  11
-	//        +---+---+---+---+---+---+---+---+---+---+---+---+
-	//        | Op-code   | I | M |      O  F  F  S  E  T     |
-	//        +---+---+---+---+---+---+---+---+---+---+---+---+
-	//    Bits 0 - 2 : Operation Code
-	//    Bit 3 : Indirect Addressing Bit (0:Direct/1:Indirect)
-	//    Bit 4 : Memory Page (0:Zero Page/1 Current Page)
-	//    Bits 5 - 11 : Offset Address 
-	// Notes:
-	//    2015-01-23: Preliminary version; need to add function calls for
-	//                recording memory accesses in the output trace file.
-	//---------------------------------------------------------------------	
-	// initialize output flags for indirect and auto-indexing to be false 
-	MemType_Indirect = FALSE;
-	MemType_AutoIndex = FALSE;
+//=========================================================
+// CALCULATE EFFECTIVE ADDRESS FUNCTION
+//---------------------------------------------------------	
+// Function: calc_eaddr
+// Description: Given the current instruction, calculates
+//    the effective address to be used.  Also will set flags
+//    indicating if indirect addressing or auto-index mode
+//    was used in calculating the effective address.  
+//    Second parameter is the program counter (needed to
+//    determine the current page).
+//    Third and fourth parameters are the pointer to the
+//    mem_array and file pointer to the trace file, to be
+//    passed along to write_mem() if needed.
+//    Last parameter is a flag for debug prints.
+// Calculate the effective address for memory reference 
+// instructions (opcodes 0 - 5).  Note that these 
+// instructions are specified as follows:
+//          0   1   2   3   4   5   6   7   8   9  10  11
+//        +---+---+---+---+---+---+---+---+---+---+---+---+
+//        | Op-code   | I | M |      O  F  F  S  E  T     |
+//        +---+---+---+---+---+---+---+---+---+---+---+---+
+//    Bits 0 - 2 : Operation Code
+//    Bit 3 : Indirect Addressing Bit (0:Direct/1:Indirect)
+//    Bit 4 : Memory Page (0:Zero Page/1 Current Page)
+//    Bits 5 - 11 : Offset Address 
+// Note: Uses the ADDR_INDIRECT_ADDR_BIT and the
+//    ADDR_MEMORY_PAGE_BIT defined above.
+//---------------------------------------------------------
+s_effective_addr calc_eaddr(short int reg_IR, short int reg_PC, s_mem_word* ptr_mem_array, FILE* fp_tracefile, char debug)
+{
+	s_effective_addr ret_EAddr;	// struct to be returned
+	short int EffectiveAddress; // temporary EAddr value 
+	short int IndirectAddrLoc;  // temp value used for indirect mode
+	short int CurrentPage;		// current page of the given PC, used in current page mode
+	// initialize output flags for indirect and auto-indexing to be false
+	ret_EAddr.flag_MemType_Indirect = FALSE;
+	ret_EAddr.flag_MemType_AutoIndex = FALSE;
 	
-	CurrentInstr = mem_array[PC]; // find the current instruction using the PC
-  
+	// masks for indirect addressing bit and page bit
+	//short int indirect_addr_bit_mask = 2^(ADDR_INDIRECT_ADDR_BIT);
+	short int indirect_addr_bit_mask = 1 << (PDP8_WORD_SIZE - ADDR_INDIRECT_ADDR_BIT - 1);
+	short int memory_page_bit_mask = 1 << (PDP8_WORD_SIZE - ADDR_MEMORY_PAGE_BIT - 1);
+	// the following offset mask will have '1's in all bit positions 
+	// containing the offset
+	short int offset_mask = (1 << (PDP8_WORD_SIZE - ADDR_OFFSET_LOW)) - 1;
+	// similarly, page_mask has '1's in the bit positions specifying the page
+	// first, set '1' bits for each bit position in the page bits
+	short int page_mask = (1 << (ADDR_PAGE_HIGH - ADDR_PAGE_LOW + 1)) - 1;
+	// then, shift the page bits into the correct position, 
+	// located to the left of the offset bits
+	page_mask = page_mask << (ADDR_OFFSET_HIGH - ADDR_OFFSET_LOW + 1);
+	
+	// determine the opcode
+	char curr_opcode = reg_IR >> (PDP8_WORD_SIZE - INSTR_OP_LOW + 1);
+	
 	// Check if the opcode of the current instruction is a memory reference 
 	// instruction (opcodes 0 to 5).
-	if ((CurrentInstr[INSTR_OP_LOW:INSTR_OP_HIGH] >= 0) && (CurrentInstr[INSTR_OP_LOW:INSTR_OP_HIGH] <= 5))
-	begin
+	if (curr_opcode >= 0) && (curr_opcode <= 5)) {
+		// strings for effective address and current instruction for debug
+		char* p_str_EAddr = malloc(PDP8_ADDR_SIZE*sizeof(char));
+		if (p_str_EAddr == null) {
+			fprintf(stderr,"malloc() for p_str_EAddr failed in calc_eaddr()\n");
+			exit(-1);
+		}
+		char* p_str_IndirectAddr = malloc(PDP8_ADDR_SIZE*sizeof(char));
+		if (p_str_IndirectAddr == null) {
+			fprintf(stderr,"malloc() for p_str_IndirectAddr failed in calc_eaddr()\n");
+			exit(-1);
+		}
+		char* p_str_IR = malloc(PDP8_WORD_SIZE*sizeof(char));
+		if (p_str_IR == null) {
+			fprintf(stderr,"malloc() for p_str_IR failed in calc_eaddr()\n");
+			exit(-1);
+		}
+		// convert the given IR to a binary string for debug
+		int_to_binary_str(reg_IR, PDP8_WORD_SIZE, p_str_IR);
 		
-	if (DEBUG_EADDR)
+		// determine the current page from the PC
+		CurrentPage = reg_PC & page_mask;
+		// determine offset from the IR
+		CurrentOffset = reg_IR & offset_mask;
+		
+		// Debug Initial Prints:
+		if (debug)
 		begin
-			$display("BEGIN EFFECTIVE ADDRESS CALC FOR NEXT INSTRUCTION:");
-			$display("         CURRENT INSTR: %b [%h]", CurrentInstr, CurrentInstr);
-			$display(" ");
-			$display("   0   1   2   3   4   5   6   7   8   9  10  11");
-			$display(" +---+---+---+---+---+---+---+---+---+---+---+---+");
-			$display(" | %b | %b | %b | %b | %b | %b | %b | %b | %b | %b | %b | %b |",
-				CurrentInstr[0],CurrentInstr[1],CurrentInstr[2],CurrentInstr[3],
-				CurrentInstr[4],CurrentInstr[5],CurrentInstr[6],CurrentInstr[7],
-				CurrentInstr[8],CurrentInstr[9],CurrentInstr[10],CurrentInstr[11]);
-			$display(" +---+---+---+---+---+---+---+---+---+---+---+---+");
-			$display(" |  op-code  | I | M |      O  F  F  S  E  T     |");
-			$display(" +---+---+---+---+---+---+---+---+---+---+---+---+");
-			$display(" ");
+			printf("BEGIN EFFECTIVE ADDRESS CALC:");
+			printf("         CURRENT INSTR: %s [%o]", *p_str_IR, reg_IR);
+			printf(" ");
+			printf("   0   1   2   3   4   5   6   7   8   9  10  11");
+			printf(" +---+---+---+---+---+---+---+---+---+---+---+---+");
+			printf(" | %c | %c | %c | %c | %c | %c | %c | %c | %c | %c | %c | %c |",
+				*p_str_IR,*(p_str_IR+1),*(p_str_IR+2),*(p_str_IR+3),
+				*(p_str_IR+4),*(p_str_IR+5),*(p_str_IR+6),*(p_str_IR+7),
+				*(p_str_IR+8),*(p_str_IR+9),*(p_str_IR+10),*(p_str_IR+11));
+			printf(" +---+---+---+---+---+---+---+---+---+---+---+---+");
+			printf(" |  op-code  | I | M |      O  F  F  S  E  T     |");
+			printf(" +---+---+---+---+---+---+---+---+---+---+---+---+");
+			printf(" ");
 		end
 		
 		// Check if the Indirect Addressing bit set...
-		if (CurrentInstr[ADDR_INDIRECT_ADDR_BIT] == 0)
-		begin // If Indirect Addressing bit = 0 (Direct addressing) 
+		if ((reg_IR & indirect_addr_bit_mask) == 0)
+		{ 	// If Indirect Addressing bit = 0 (Direct addressing) 
 			// Check if the Memory Page bit is set...
-			if (CurrentInstr[ADDR_MEMORY_PAGE_BIT] == 0)
-			begin  
+			if ((reg_IR & memory_page_bit_mask) == 0)
+			{  
 				// Check if the AutoIndex registers are selected.
 				//--------------------------------------------
 				// ADDRESSING MODE 1: Zero Page Addressing
 				//    Effective Address <- 00000 + Offset
-				EffectiveAddress = {5'b0, CurrentInstr[ADDR_OFFSET_LOW:ADDR_OFFSET_HIGH]};
+				EffectiveAddress = CurrentOffset;
 				
-				if (DEBUG_EADDR)
-				begin
-					$display("  -- ZERO PAGE ADDRESSING --");
-					$display("     EFFECTIVE ADDRESS: %b [%h]", EffectiveAddress, EffectiveAddress);
-				end
+				// convert to binary string for debug print
+				int_to_binary_str(EffectiveAddress, PDP8_ADDR_SIZE, p_str_EAddr);
+				
+				if (debug) {
+					printf("  -- ZERO PAGE ADDRESSING --");
+					printf("     EFFECTIVE ADDRESS: %s [%o]", *p_str_EAddr, EffectiveAddress);
+				}
 				//--------------------------------------------
-			end
+			}
 			else // Memory Page bit = 1
-			begin  
+			{  
 				//--------------------------------------------
 				// ADDRESSING MODE 2: Current Page Addressing
 				//    Effective Address <- Old_PC[0:4] + Offset
-				EffectiveAddress = {PC[ADDR_PAGE_LOW:ADDR_PAGE_HIGH], CurrentInstr[ADDR_OFFSET_LOW:ADDR_OFFSET_HIGH]};
+				EffectiveAddress = CurrentPage + CurrentOffset;
 				
-				if (DEBUG_EADDR)
-				begin
-					$display("  -- CURRENT PAGE ADDRESSING --");
-					$display("     EFFECTIVE ADDRESS: %b [%h]", EffectiveAddress, EffectiveAddress);
-				end
+				// convert to binary string for debug print
+				int_to_binary_str(EffectiveAddress, PDP8_ADDR_SIZE, p_str_EAddr);
+				
+				if (debug) {
+					printf("  -- CURRENT PAGE ADDRESSING --");
+					printf("     EFFECTIVE ADDRESS: %s [%o]", *p_str_EAddr, EffectiveAddress);
+				}
 				//--------------------------------------------
-			end
-		end // end if for direct addressing
+			}
+		} // end if for direct addressing
 		else // Indirect Addressing bit = 1
-		begin
+		{
 			// Check if locations outside of 0010 through 0017 (octal) have been indicated
-			if (!((CurrentInstr[ADDR_OFFSET_LOW:ADDR_OFFSET_HIGH] >= 8) && (CurrentInstr[ADDR_OFFSET_LOW:ADDR_OFFSET_HIGH] < 15)))
-			begin
+			if (!((CurrentOffset >= 8) && (CurrentOffset < 15)))
+			{
 				//--------------------------------------------
 				// ADDRESSING MODE 3: Indirect Addressing
-				if (CurrentInstr[ADDR_MEMORY_PAGE_BIT] == 0)
-				begin  // If Zero Page Addressing, then: 
+				if ((reg_IR & memory_page_bit_mask) == 0)	// check if memory page bit is 0
+				{  	// If Zero Page Addressing, then: 
 					//    Effective Address <- C(00000 + Offset)
-					IndirectAddrLoc = {5'b0, CurrentInstr[ADDR_OFFSET_LOW:ADDR_OFFSET_HIGH]};
-					EffectiveAddress = mem_array[IndirectAddrLoc];
+					IndirectAddrLoc = CurrentOffset;
 					//FUNCTION CALL TO READMEM FOR LOG
-					tracecheck = writetrace(READ, IndirectAddrLoc);	
+					EffectiveAddress = read_mem(IndirectAddrLoc, TF_READ, ptr_mem_array, fp_tracefile);	
+					//EffectiveAddress = *(ptr_mem_array+IndirectAddrLoc);
 					
-					if (DEBUG_EADDR)
-					begin
-						$display("  -- INDIRECT ADDRESSING; ZERO PAGE --");
-						$display("INDIRECT ADDR LOCATION: %b [%h]", IndirectAddrLoc, IndirectAddrLoc);
-						$display("     EFFECTIVE ADDRESS: %b [%h]", EffectiveAddress, EffectiveAddress);
-					end
-				end
+					// convert to binary string for debug print
+					int_to_binary_str(EffectiveAddress, PDP8_ADDR_SIZE, p_str_EAddr);
+					int_to_binary_str(IndirectAddrLoc, PDP8_ADDR_SIZE, p_str_IndirectAddr);
+					
+					if (debug) {
+						printf("  -- INDIRECT ADDRESSING; ZERO PAGE --");
+						printf("INDIRECT ADDR LOCATION: %s [%o]", *p_str_IndirectAddr, IndirectAddrLoc);
+						printf("     EFFECTIVE ADDRESS: %s [%o]", *p_str_EAddr, EffectiveAddress);
+					}
+				}
 				else
-				begin  // If Current Page Addressing, then:
+				{  	// If Current Page Addressing, then:
 					//    Effective Address <- C(Old_PC[0:4] + Offset)
-					IndirectAddrLoc = {PC[ADDR_PAGE_LOW:ADDR_PAGE_HIGH], CurrentInstr[ADDR_OFFSET_LOW:ADDR_OFFSET_HIGH]};
-					EffectiveAddress = mem_array[IndirectAddrLoc];
-					//FUNCTION CALL TO READMEM FOR LOG
-					readcheck = read_mem(READ, IndirectAddrLoc, 0);
-					//tracecheck = writetrace(READ, IndirectAddrLoc);	
+					IndirectAddrLoc = CurrentPage + CurrentOffset;
+					//FUNCTION CALL TO READMEM TO OBTAIN VALUE at IndirectAddrLoc
+					EffectiveAddress = read_mem(IndirectAddrLoc, TF_READ, ptr_mem_array, fp_tracefile);
+					//EffectiveAddress = *(ptr_mem_array+IndirectAddrLoc);
 					
-					if (DEBUG_EADDR)
-					begin
-						$display("  -- INDIRECT ADDRESSING; CURRENT PAGE --");
-						$display("INDIRECT ADDR LOCATION: %b [%h]", IndirectAddrLoc, IndirectAddrLoc);
-						$display("     EFFECTIVE ADDRESS: %b [%h]", EffectiveAddress, EffectiveAddress);
-					end
-				end
+					// convert to binary string for debug print
+					int_to_binary_str(EffectiveAddress, PDP8_ADDR_SIZE, p_str_EAddr);
+					int_to_binary_str(IndirectAddrLoc, PDP8_ADDR_SIZE, p_str_IndirectAddr);
+					
+					if (debug) {
+						printf("  -- INDIRECT ADDRESSING; CURRENT PAGE --");
+						printf("INDIRECT ADDR LOCATION: %s [%o]", *p_str_IndirectAddr, IndirectAddrLoc);
+						printf("     EFFECTIVE ADDRESS: %s [%o]", *p_str_EAddr, EffectiveAddress);
+					}
+				}
 			  
-			 // set flag to indicate indirect addressing was used
-			 MemType_Indirect = TRUE;
-			end
+				// set flag to indicate indirect addressing was used
+				ret_EAddr.flag_MemType_Indirect = TRUE;
+			}
 			else // offset location from 0010 through 0017 (octal) was specified
-			begin
+			{
 				//--------------------------------------------
 				// ADDRESSING MODE 4: AutoIndex Addressing
 				//      C(AutoIndex_Register) <- C(AutoIndex_Register) + 1
 				//      EffectiveAddress <- C(AutoIndex_Register)
-				IndirectAddrLoc = {5'b0, CurrentInstr[ADDR_OFFSET_LOW:ADDR_OFFSET_HIGH]};
-
-				if (DEBUG_EADDR)
-				begin
-					$display("  -- AUTO-INDEX ADDRESSING --");
-					$display("INDIRECT ADDR LOCATION: %b [%h]", IndirectAddrLoc, IndirectAddrLoc);
-					$display("  Orig M[IndirectAddr]: %b [%h]", mem_array[IndirectAddrLoc], mem_array[IndirectAddrLoc]);
-				end
+				IndirectAddrLoc = CurrentOffset;
+				EffectiveAddress = *(ptr_mem_array+IndirectAddrLoc); // pre-incremented value
 				
-				EffectiveAddress = mem_array[IndirectAddrLoc] + 1; // read mem val and increment by 1
 				//FUNCTION CALL TO READMEM FOR LOG
-				readcheck = read_mem(READ, IndirectAddrLoc, 0);
-				//tracecheck = writetrace(READ, IndirectAddrLoc);	
+				read_mem(IndirectAddrLoc, TF_READ, ptr_mem_array, fp_tracefile);
+				
+				// convert to binary string for debug print
+				int_to_binary_str(EffectiveAddress, PDP8_ADDR_SIZE, p_str_EAddr);
+				int_to_binary_str(IndirectAddrLoc, PDP8_ADDR_SIZE, p_str_IndirectAddr);
+
+				if (debug)
+				{
+					printf("  -- AUTO-INDEX ADDRESSING --");
+					printf("INDIRECT ADDR LOCATION: %s [%o]", *p_str_IndirectAddr, IndirectAddrLoc);
+					printf("  Orig M[IndirectAddr]: %s [%o]", *p_str_EAddr, EffectiveAddress);
+				}
+				
+				// Calculate the actual incremented value to be used as the effective address
+				EffectiveAddress++; // read mem val and increment by 1
+				// convert to binary string for debug print
+				int_to_binary_str(EffectiveAddress, PDP8_ADDR_SIZE, p_str_EAddr);
 				
 				// Write new value to memory
-				writecheck = write_mem(IndirectAddrLoc, EffectiveAddress);
-				//mem_array[IndirectAddrLoc] = EffectiveAddress; // update value in mem
-				
-				//FUNCTION CALL TO WRITEMEM FOR LOG
-				//tracecheck = writetrace(WRITE, IndirectAddrLoc);	
+				write_mem(IndirectAddrLoc, EffectiveAddress, ptr_mem_array, fp_tracefile);
 				
 				// set flag to indicate auto-index addressing was used
-				MemType_AutoIndex = TRUE;
+				ret_EAddr.flag_MemType_AutoIndex = TRUE;
 				
-				
-				if (DEBUG_EADDR)
-				begin
-					$display("     EFFECTIVE ADDRESS: %b [%h]", EffectiveAddress, EffectiveAddress);
-				end
-			end
-		end // end else where indirect addressing bit = 1
+				if (debug) {
+					printf("     EFFECTIVE ADDRESS: %s [%o]", *p_str_EAddr, EffectiveAddress);
+				}
+			}
+		} // end else where indirect addressing bit = 1
 		
-		if (DEBUG_EADDR)
-		begin
-			$display("----------------------------------------------------");
-		end
+		if (debug) {
+			printf("----------------------------------------------------");
+		}
+	
+		free(p_str_EAddr); // free the strings that were used for debug
+		free(p_str_IndirectAddr);
+		free(p_str_IR);	
 		
-		// get the value in memory at the EAddr, which may be used
-		// by the instruction, depending on the opcode.  note that
-		// recording the memory read/write from this effective address
-		// in the tracefile is performed on the negedge of clock at
-		// the same time that the changes to the registers/memory
-		// are recorded for the current opcode.  This just obtains
-		// the memory value for input to the opcode modules.
-		memval_eaddr = mem_array[EffectiveAddress];
+		ret_EAddr.EAddr = EffectiveAddress; // save calculated EAddr to return value struct
+	}
 		
-	end // end if block where opcode of the current instruction is a memory reference instr.
-	else // otherwise don't use an effective address.
-	begin
-		EffectiveAddress = 'x;
-		memval_eaddr = 'x;
-	end
-*/
+	return ret_EAddr;
+}
+
+s_updated_vals module_AND (reg_AC)
