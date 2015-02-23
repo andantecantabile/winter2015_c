@@ -371,22 +371,34 @@ int main (int argc, char* argv[])
 							break;
 			case OP_ISZ:  	stat_isz = stat_isz + 1;
 							stat_clocks = stat_clocks + 2;
-							if (MemType_AutoIndex)
+							if (curr_eaddr.flag_MemType_AutoIndex)
 								stat_clocks = stat_clocks + 2;
-							if (MemType_Indirect)
+							if (curr_eaddr.flag_MemType_Indirect)
 								stat_clocks = stat_clocks + 1;
 							break;
-			case OP_DCA:  	printf("  DCA    LR: %b AC: %b [%3x]\n", reg_LR, next_vals.AC, next_vals.AC);
+			case OP_DCA:  	stat_dca = stat_dca + 1;
+							stat_clocks = stat_clocks + 2;
+							if (curr_eaddr.flag_MemType_AutoIndex)
+								stat_clocks = stat_clocks + 2;
+							if (curr_eaddr.flag_MemType_Indirect)
+								stat_clocks = stat_clocks + 1;
 							break;
-			case OP_JMS:  	printf("  JMS    LR: %b AC: %b [%3x]\n", reg_LR, reg_AC, reg_AC);
+			case OP_JMS:  	stat_jms = stat_jms + 1;
+							stat_clocks = stat_clocks + 2;
+							if (curr_eaddr.flag_MemType_AutoIndex)
+								stat_clocks = stat_clocks + 2;
+							if (curr_eaddr.flag_MemType_Indirect)
+								stat_clocks = stat_clocks + 1;
 							break;
-			case OP_JMP:  	printf("  JMP    LR: %b AC: %b [%3x]\n", reg_LR, reg_AC, reg_AC);
+			case OP_JMP:  	stat_jmp = stat_jmp + 1;
+							stat_clocks = stat_clocks + 1;	
 							break;
-			case OP_IO:   	printf("  IO     LR: %b AC: %b [%3x]\n", reg_LR, next_vals.AC, next_vals.AC);
+			case OP_IO:   	stat_io = stat_io + 1;
 							break;
-			case OP_UI:   	printf("  UI     LR: %b AC: %b [%3x]\n", next_vals.LR, next_vals.AC, next_vals.AC);
+			case OP_UI:   	stat_ui = stat_ui + 1;
+							stat_clocks = stat_clocks + 1;
 							break;
-			default: printf("WARNING! UNKNOWN OP CODE LR: %b AC: %b [%x]\n", reg_LR, reg_AC, reg_AC);
+			default: printf("WARNING! UNKNOWN OP CODE LR: %o AC: %x [%o]\n", reg_LR, reg_AC, reg_AC);
 							break;
 		}
 		
@@ -412,51 +424,6 @@ begin
 	// from the active opcode module for this instruction.
 	case(mem_array[PC][0:2])
 
-		OP_ISZ:
-			begin
-				if(DEBUG)
-				begin
-					printf("VALUES AFTER UPDATE [OP_ISZ]:");
-					printf("               NEXT PC: %b [%h]", nextPC2, nextPC2);
-					printf("         NEXT M[EAddr]: %b [%h]", next_memval_eaddr2, next_memval_eaddr2);
-					printf("----------------------------------------------------");
-				end
-			
-				// write to branch trace file BEFORE update of PC
-				branch_check = branchtrace(PC, mem_array[PC][0:2], flag_branch_taken2, nextPC2);
-			
-				// Update Changes to Registers
-				PC = nextPC2;		//Program Counter
-				
-				// write data to memory / update trace file
-				writecheck = write_mem(EffectiveAddress, next_memval_eaddr2);
-			end
-		OP_DCA:
-			begin
-				if(DEBUG)
-				begin
-					printf("VALUES AFTER UPDATE [OP_DCA]:");
-					printf("               NEXT PC: %b [%h]", nextPC3, nextPC3);
-					printf("               NEXT AC: %b [%h]", nextAC3, nextAC3);
-					printf("         NEXT M[EAddr]: %b [%h]", next_memval_eaddr3, next_memval_eaddr3);
-					printf("----------------------------------------------------");
-				end
-
-				//Update Changes to Registers
-				AC = nextAC3;		//Accumulator
-				PC = nextPC3;		// Program Counter
-				
-				stat_dca = stat_dca + 1;
-				stat_clocks = stat_clocks + 2;
-				if (MemType_AutoIndex)
-					stat_clocks = stat_clocks + 2;
-				if (MemType_Indirect)
-					stat_clocks = stat_clocks + 1;
-					
-				// Write new value to memory / update trace file
-				writecheck = write_mem(EffectiveAddress, next_memval_eaddr3);
-				//tracecheck = writetrace(WRITE, EffectiveAddress);	
-			end
 		OP_JMS:
 			begin
 				if(DEBUG)
@@ -472,13 +439,6 @@ begin
 
 				//Update Changes to Registers
 				PC = nextPC4;		//Program Counter
-				
-				stat_jms = stat_jms + 1;
-				stat_clocks = stat_clocks + 2;
-				if (MemType_AutoIndex)
-					stat_clocks = stat_clocks + 2;
-				if (MemType_Indirect)
-					stat_clocks = stat_clocks + 1;
 				
 				// Write new value to memory / update trace file
 				writecheck = write_mem(EffectiveAddress, next_memval_eaddr4);
@@ -499,8 +459,6 @@ begin
 				//Update Changes to Registers
 				PC = nextPC5;		//Program Counter
 				
-				stat_jmp = stat_jmp + 1;
-				stat_clocks = stat_clocks + 1;	
 			end
 		OP_IO:
 			begin
@@ -513,7 +471,6 @@ begin
 				
 				//Update Changes to Registers
 				
-				stat_io = stat_io + 1;
 			end
 		default:	//UI
 			begin
@@ -538,8 +495,7 @@ begin
 				AC = nextAC7;		//Accumulator
 				SR = nextSR7;		//Console Switch Register
 				
-				stat_ui = stat_ui + 1;
-				stat_clocks = stat_clocks + 1;
+				
 			end
 	endcase
 	
