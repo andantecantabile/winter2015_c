@@ -341,15 +341,30 @@ int main (int argc, char* argv[])
 							// Update Registers
 							AC = next_AC;
 							break;
-			case OP_JMS:  	printf("  JMS    LR: %b AC: %b [%3x]\n", reg_LR, reg_AC, reg_AC);
+			case OP_JMS:  	next_memval_eaddr = next_PC;
+							next_PC = (effective_address + 1) & address_mask;
+							// write updated value to memory
+							write_mem(effective_address, next_memval_eaddr, &mem_array[0], fp_tracefile);
+							// Debug Print
+							if (debug.module) printf("               NEXT PC: [%o]", next_PC);
+							if (debug.module) printf("         NEXT M[EAddr]: [%o]", next_memval_eaddr);
+							// Update Registers
+							PC = next_PC;
 							break;
-			case OP_JMP:  	printf("  JMP    LR: %b AC: %b [%3x]\n", reg_LR, reg_AC, reg_AC);
+			case OP_JMP:  	next_PC = effective_address;
+							// Debug Print
+							if (debug.module) printf("               NEXT PC: [%o]", next_PC);
+							// Update Registers
+							PC = next_PC;
 							break;
-			case OP_IO:   	printf("  IO     LR: %b AC: %b [%3x]\n", reg_LR, next_vals.AC, next_vals.AC);
+			case OP_IO:   	// Not implemented.
+							fprintf(stderr,"WARNING: IO instruction encountered at PC: [%o]\n",reg_PC);
+							// Update Registers
+							PC = next_PC;
 							break;
 			case OP_UI:   	printf("  UI     LR: %b AC: %b [%3x]\n", next_vals.LR, next_vals.AC, next_vals.AC);
 							break;
-			default: printf("WARNING! UNKNOWN OP CODE LR: %b AC: %b [%x]\n", reg_LR, reg_AC, reg_AC);
+			default: 		fprintf(stderr,"WARNING! UNKNOWN OP CODE: %d LR: %o AC: [%o]\n", curr_opcode, reg_LR, reg_AC, reg_AC);
 							break;
 		}
 		
@@ -424,54 +439,6 @@ begin
 	// from the active opcode module for this instruction.
 	case(mem_array[PC][0:2])
 
-		OP_JMS:
-			begin
-				if(DEBUG)
-				begin
-					printf("VALUES AFTER UPDATE [OP_JMS]:");
-					printf("               NEXT PC: %b [%h]", nextPC4, nextPC4);
-					printf("         NEXT M[EAddr]: %b [%h]", next_memval_eaddr4, next_memval_eaddr4);
-					printf("----------------------------------------------------");
-				end
-				
-				// write to branch trace file BEFORE update of PC
-				branch_check = branchtrace(PC, mem_array[PC][0:2], 1, nextPC4);
-
-				//Update Changes to Registers
-				PC = nextPC4;		//Program Counter
-				
-				// Write new value to memory / update trace file
-				writecheck = write_mem(EffectiveAddress, next_memval_eaddr4);
-				//tracecheck = writetrace(WRITE, EffectiveAddress);		
-			end
-		OP_JMP:
-			begin
-				if(DEBUG)
-				begin
-					printf("VALUES AFTER UPDATE [OP_JMP]:");
-					printf("               NEXT PC: %b [%h]", nextPC5, nextPC5);
-					printf("----------------------------------------------------");
-				end
-				
-				// write to branch trace file BEFORE update of PC
-				branch_check = branchtrace(PC, mem_array[PC][0:2], 1, nextPC5);
-				
-				//Update Changes to Registers
-				PC = nextPC5;		//Program Counter
-				
-			end
-		OP_IO:
-			begin
-				if(DEBUG)
-				begin
-					printf("VALUES AFTER UPDATE [OP_IO]:");
-					printf("                  NONE.");
-					printf("----------------------------------------------------");
-				end
-				
-				//Update Changes to Registers
-				
-			end
 		default:	//UI
 			begin
 				if(DEBUG)
