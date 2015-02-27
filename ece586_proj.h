@@ -20,8 +20,13 @@
 #define TF_FETCH 2
 
 // BRANCH TYPE PARAMETERS:
-#define BT_UNCONDITIONAL 0
-#define BT_CONDITIONAL   1
+#define BT_NO_BRANCH     0
+#define BT_UNCONDITIONAL 1
+#define BT_CONDITIONAL   2
+
+// BRANCH TAKEN PARAMETERS:
+#define BT_NOT_TAKEN 0
+#define BT_TAKEN     1
 
 // ARCHITECTURE PARAMETERS
 //-------------------------
@@ -37,6 +42,7 @@
 #define MEM_ARRAY_MAX PDP8_MEMSIZE-1	// max index number of mem array
     // total number of words in memory
 #define PDP8_ADDR_SIZE 12	// size of address in bits, hard-coded
+#define WORD_STRING_SIZE PDP8_WORD_SIZE+1
 // Note that addresses are specified with the bits numbered as follows:
 //  <    p  a  g  e    > <     o  f  f  s  e  t     >
 //  |___|___|___|___|___|___|___|___|___|___|___|___|
@@ -97,11 +103,10 @@ typedef struct _updated_vals {
 	short int LR;	// Link Register [0]
 	short int AC;	// Accumulator [0:11]
 	short int SR;	// Switch Register [0:11]
-	short int memval_eaddr;	// Value to be stored in memory at EAddr
+//	short int memval_eaddr;	// Value to be stored in memory at EAddr
 	char flag_HLT;	// indicating HLT micro instruction was given
 	char flag_NOP;	// indicating illegal instruction was given
-	char flag_GRP2_SKP_UNCOND;	// set to 1 if the SKIP ALL grp 2 micro instruction was given
-	char flag_GRP2_SKP;		// set to 1 if any other skip grp 2 microinstruction was given.
+	char flag_branch_type;	// set to 0 if there was no branch, 1 for unconditional, 2 for conditional.
 	char flag_branch_taken;	// set to 1 if a branch was taken
 } s_updated_vals;
 
@@ -340,45 +345,45 @@ void write_branch_trace(FILE* fp_branchtrace, short int PC, char opcode, short i
 	// Append PC, opcode (branch type), Branch T/NT, and target address in trace file
 	switch (opcode) {
 		case OP_ISZ:
-			if (flag_branch_taken) {
-				fprintf(fp_branchtrace, "%x [%o]    ISZ           TAKEN              %x [%o]\n", PC, PC, target_address, target_address);
+			if (flag_branch_taken == BT_TAKEN) {
+				fprintf(fp_branchtrace, "%x [%o]    CONDITIONAL [ISZ]   TAKEN              %x [%o]\n", PC, PC, target_address, target_address);
 				(branch_stats->ISZ_t_count)++;
 			}
 			else {
-				fprintf(fp_branchtrace, "%x [%o]    ISZ           NOT TAKEN          %x [%o]\n", PC, PC, target_address, target_address);
+				fprintf(fp_branchtrace, "%x [%o]    CONDITIONAL [ISZ]   NOT TAKEN          %x [%o]\n", PC, PC, target_address, target_address);
 				(branch_stats->ISZ_nt_count)++;
 			}
 			break;
 		
 		case OP_JMS:
-			fprintf(fp_branchtrace, "%x [%o]    JMS           TAKEN              %x [%o]\n", PC, PC, target_address, target_address);
+			fprintf(fp_branchtrace, "%x [%o]    UNCONDITIONAL [JMS] TAKEN              %x [%o]\n", PC, PC, target_address, target_address);
 			(branch_stats->JMS_t_count)++;
 			break;
 		
 		case OP_JMP:
-			fprintf(fp_branchtrace, "%x [%o]    JMP           TAKEN              %x [%o]\n", PC, PC, target_address, target_address);
+			fprintf(fp_branchtrace, "%x [%o]    UNCONDITIONAL [JMP] TAKEN              %x [%o]\n", PC, PC, target_address, target_address);
 			(branch_stats->JMP_t_count)++;
 			break;
 			
 		case OP_UI:
 			if (flag_branch_type == BT_UNCONDITIONAL) {
-				if (flag_branch_taken) {
-					fprintf(fp_branchtrace, "%x [%o]    MICRO_OP-SKP  TAKEN              %x [%o]\n", PC, PC, target_address, target_address);
+				if (flag_branch_taken == BT_TAKEN) {
+					fprintf(fp_branchtrace, "%x [%o]    UNCONDITIONAL [UI]  TAKEN              %x [%o]\n", PC, PC, target_address, target_address);
 					(branch_stats->UI_uncond_t_count)++;
 				}
 				else {
-					fprintf(fp_branchtrace, "%x [%o]    MICRO_OP-SKP  NOT TAKEN          %x [%o]\n", PC, PC, target_address, target_address);
+					fprintf(fp_branchtrace, "%x [%o]    UNCONDITIONAL [UI]  NOT TAKEN          %x [%o]\n", PC, PC, target_address, target_address);
 					(branch_stats->UI_uncond_nt_count)++; // NOTE: This should never be incremented. If it is, there is an error somewhere!
 				}
 			}
-			else
+			else if (flag_branch_type == BT_CONDITIONAL)
 			{
-				if (flag_branch_taken) {
-					fprintf(fp_branchtrace, "%x [%o]    MICRO_OPS     TAKEN              %x [%o]\n", PC, PC, target_address, target_address);
+				if (flag_branch_taken == BT_TAKEN) {
+					fprintf(fp_branchtrace, "%x [%o]    CONDITIONAL [UI]    TAKEN              %x [%o]\n", PC, PC, target_address, target_address);
 					(branch_stats->UI_cond_t_count)++;
 				}
 				else {
-					fprintf(fp_branchtrace, "%x [%o]    MICRO_OPS     NOT TAKEN          %x [%o]\n", PC, PC, target_address, target_address);
+					fprintf(fp_branchtrace, "%x [%o]    CONDITIONAL [UI]    NOT TAKEN          %x [%o]\n", PC, PC, target_address, target_address);
 					(branch_stats->UI_cond_nt_count)++;
 				}
 			}
@@ -697,4 +702,129 @@ s_effective_addr calc_eaddr(short int reg_IR, short int reg_PC, s_mem_word* ptr_
 	return ret_EAddr;
 }
 
-s_updated_vals module_AND (reg_AC)
+//=========================================================
+// UI SUBROUTINE
+//---------------------------------------------------------	
+// Function: module_UI
+// Description: Given the current instruction, PC, AC, LR, 
+//    and SR as parameters this subroutine will execute 
+//    the given UI instruction.
+// Return Values: The next PC, AC, LR, and SR values will 
+//    be returned in the struct, as well as flags 
+//    indicating:
+//        if a NOP was executed, 
+//        if a HLT was issued, 
+//        if a grp2 skip instruction
+//---------------------------------------------------------
+s_updated_vals module_UI (short int IR, short int PC, short int AC, char LR, short int SR, char debug)
+{
+	s_updated_vals ret_vals;	// return value struct
+	char flag_skip_instr = 0;	// flag indicating if next instruction should be skipped
+	ret_vals.PC = PC;	// initialize all return values
+	ret_vals.AC = AC;
+	ret_vals.LR = LR;
+	ret_vals.SR = SR;
+	ret_vals.flag_HLT = FALSE;
+	ret_vals.flag_NOP = FALSE;
+	ret_vals.flag_branch_type = BT_NO_BRANCH;
+	ret_vals.flag_branch_taken = BT_NOT_TAKEN;
+	
+	// mask to be used after addition and inversion of the LR bit, 
+	// to ensure that result in a register only contains that 
+	// number of bits
+	short int word_mask = (1 << PDP8_WORD_SIZE) - 1;
+	
+	char[WORD_STRING_SIZE] str_IR;	// string for displaying binary value of IR
+	int_to_binary_str(IR, PDP8_WORD_SIZE, &str_IR);
+	
+	if (debug) {
+		printf(" \n");
+		printf("***************** UI MODULE DEBUG ******************\n");
+		printf("   Current Instr: %s [%o]\n", str_IR, IR);
+		printf(" \n");
+		printf("   0   1   2   3   4   5   6   7   8   9  10  11\n");
+		printf(" +---+---+---+---+---+---+---+---+---+---+---+---+\n");
+		printf(" | %c | %c | %c | %c | %c | %c | %c | %c | %c | %c | %c | %c |\n",
+			str_IR[0],str_IR[1],str_IR[2],str_IR[3],str_IR[4],str_IR[5],
+			str_IR[6],str_IR[7],str_IR[8],str_IR[9],str_IR[10],str_IR[11]);
+		printf(" +---+---+---+---+---+---+---+---+---+---+---+---+");
+	}
+	
+	// Group 1 Microinstructions: Check if bit 3 is a 0
+	if ( ((IR >> (PDP8_WORD_SIZE-3-1)) & 1) == 0) {
+		// Print debug statements for bit identification
+		if (debug) {
+			printf("                  cla cll cma cml rar ral 0/1 iac\n");
+			printf(" \n");
+			printf(" Group 1 Microinstructions:\n");
+		}
+		
+		// if bits IR[4:11] == 0, then the instruction is a NOP
+		if ( (IR << 4) == 0) {
+			ret_vals.flag_NOP = 1;
+		}
+		else {
+			// Sequence 1: CLA/CLL
+			// Check if bits 4 and 5 were set
+			if ( ((IR >> (PDP8_WORD_SIZE - 4-1)) & 1) == 1) {
+				ret_vals.AC = 0;
+				if (debug) {
+					printf(" -- Clear Accumulator\n");
+					printf("                NEW AC: %x [%o]\n", ret_vals.AC, ret_vals.AC);
+				}
+			}
+			if ( ((IR >> (PDP8_WORD_SIZE - 5-1)) & 1) == 1) {
+				ret_vals.LR = 0;
+				if (debug) {
+					printf(" -- Clear Link Register\n");
+					printf("                NEW LR: [%o]\n", ret_vals.LR, ret_vals.LR);
+				}
+			}
+			
+			// Sequence 2: CMA/CML
+			// Check if bits 6 and 7 were set
+			// Check if bits 4 and 5 were set
+			if ( ((IR >> (PDP8_WORD_SIZE - 6-1)) & 1) == 1) {
+				ret_vals.AC = ~(ret_vals.AC);
+				if (debug) {
+					printf(" -- Complement Accumulator\n");
+					printf("                NEW AC: %x [%o]\n", ret_vals.AC, ret_vals.AC);
+				}
+			}
+			if ( ((IR >> (PDP8_WORD_SIZE - 7-1)) & 1) == 1) {
+				ret_vals.LR = (ret_vals.LR) ^ 1;
+				if (debug) {
+					printf(" -- Complement Link Register");
+					printf("                NEW LR: [%o]\n", ret_vals.LR, ret_vals.LR);
+				}
+			}
+			
+			// Sequence 3: IAC
+			// Check if bit 11 is set
+			if ( ((IR >> (PDP8_WORD_SIZE - 11-1)) & 1) == 1) {
+				ret_vals.AC = (ret_vals.AC) + 1;
+				if ((ret_vals.AC >> PDP8_WORD_SIZE) != 0) {
+					ret_vals.LR = (ret_vals.LR) ^ 1; // this will flip the least significant bit of the LR.
+				}
+				ret_vals.AC = ret_vals.AC & word_mask;
+				
+				if (debug) {
+					printf(" -- Complement Accumulator\n");
+					printf("                NEW AC: %3x [%4o]\n", ret_vals.AC, ret_vals.AC);
+					printf("                NEW LR: %3x [%4o]", nextLR, nextLR);
+				}
+			}
+			
+			// Sequence 4: RAR/RAL
+			
+		}
+	} // End Group 1 Microinstructions section
+	else if () {
+		// Group 2 Microinstructions
+	}
+	else {
+		
+	}
+		
+	return ret_vals; // return updated values
+}

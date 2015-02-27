@@ -328,10 +328,10 @@ int main (int argc, char* argv[])
 							// Debug Print
 							if (debug.module) printf("               NEXT PC: [%o]", next_PC);
 							if (debug.module) printf("         NEXT M[EAddr]: [%o]", next_memval_eaddr);
-							// Update Registers
-							reg_PC = next_PC;
 							// update branch statistics, and write to branch trace file
 							write_branch_trace(fp_branchtrace, reg_PC, curr_opcode, next_PC, flag_branch_taken, BT_CONDITIONAL, &branch_statistics);
+							// Update Registers
+							reg_PC = next_PC;
 							break;
 			case OP_DCA:  	// write AC to memory
 							write_mem(effective_address, AC, &mem_array[0], fp_tracefile);
@@ -339,7 +339,7 @@ int main (int argc, char* argv[])
 							// Debug Print
 							if (debug.module) printf("               NEXT AC: [%o]", next_AC);
 							// Update Registers
-							AC = next_AC;
+							reg_AC = next_AC;
 							break;
 			case OP_JMS:  	next_memval_eaddr = next_PC;
 							next_PC = (effective_address + 1) & address_mask;
@@ -348,21 +348,36 @@ int main (int argc, char* argv[])
 							// Debug Print
 							if (debug.module) printf("               NEXT PC: [%o]", next_PC);
 							if (debug.module) printf("         NEXT M[EAddr]: [%o]", next_memval_eaddr);
+							// update branch statistics, and write to branch trace file
+							write_branch_trace(fp_branchtrace, reg_PC, curr_opcode, next_PC, BT_TAKEN, BT_UNCONDITIONAL, &branch_statistics);
 							// Update Registers
-							PC = next_PC;
+							reg_PC = next_PC;
 							break;
 			case OP_JMP:  	next_PC = effective_address;
 							// Debug Print
 							if (debug.module) printf("               NEXT PC: [%o]", next_PC);
+							// update branch statistics, and write to branch trace file
+							write_branch_trace(fp_branchtrace, reg_PC, curr_opcode, next_PC, BT_TAKEN, BT_UNCONDITIONAL, &branch_statistics);
 							// Update Registers
-							PC = next_PC;
+							reg_PC = next_PC;
 							break;
 			case OP_IO:   	// Not implemented.
 							fprintf(stderr,"WARNING: IO instruction encountered at PC: [%o]\n",reg_PC);
 							// Update Registers
 							PC = next_PC;
 							break;
-			case OP_UI:   	printf("  UI     LR: %b AC: %b [%3x]\n", next_vals.LR, next_vals.AC, next_vals.AC);
+			case OP_UI:   	// Obtain next values from the UI subroutine
+							// Note that next_PC is passed as an argument here since PC has been pre-incremented.
+							next_vals = module_UI(reg_IR, next_PC, reg_AC, reg_LR, reg_SR, debug.module);
+							
+							printf("  UI     LR: %b AC: %b [%3x]\n", next_vals.LR, next_vals.AC, next_vals.AC);
+							// Debug Print
+							if (debug.module) printf("               NEXT PC: [%o]", next_PC);
+							if (debug.module) printf("         NEXT M[EAddr]: [%o]", next_memval_eaddr);
+							// update branch statistics, and write to branch trace file
+							write_branch_trace(fp_branchtrace, reg_PC, curr_opcode, next_PC, next_vals.flag_branch_taken, next_vals.flag_branch_type, &branch_statistics);
+							// Update Registers
+							reg_PC = next_PC;
 							break;
 			default: 		fprintf(stderr,"WARNING! UNKNOWN OP CODE: %d LR: %o AC: [%o]\n", curr_opcode, reg_LR, reg_AC, reg_AC);
 							break;
