@@ -11,6 +11,7 @@
 //=========================================================
 // PARAMETER SECTION
 //=========================================================
+/*
 // GENERAL PARAMETERS:
 //---------------------
 #define TRUE 1
@@ -46,7 +47,7 @@
 #define OP_JMP 5
 #define OP_IO  6
 #define OP_UI  7
-	
+*/
 // DEFAULT STARTING ADDRESS: (in decimal)
 #define DEFAULT_STARTING_ADDRESS 128
 
@@ -231,15 +232,18 @@ int main (int argc, char* argv[])
 			default:		curr_opcode_str = "ILLEGAL OP";
 							break;
 		}
-		// Get binary values of initial values
-		int_to_binary_str(reg_PC, PDP8_ADDR_SIZE, &bin_str_PC);
-		int_to_binary_str(reg_IR, PDP8_WORD_SIZE, &bin_str_IR);
-		int_to_binary_str(effective_address, PDP8_ADDR_SIZE, &bin_str_EAddr);
-		int_to_binary_str(memval_eaddr, PDP8_WORD_SIZE, &bin_str_memval_EAddr);
-		int_to_binary_str(reg_AC, PDP8_WORD_SIZE, &bin_str_AC);
-		int_to_binary_str(reg_LR, 1, &bin_str_LR);
-		int_to_binary_str(reg_SR, PDP8_WORD_SIZE, &bin_str_SR);
 		
+		if (debug.instr || debug.short_mode) {
+			// Get binary values of initial values
+			int_to_binary_str(reg_PC, PDP8_ADDR_SIZE, &bin_str_PC);
+			int_to_binary_str(reg_IR, PDP8_WORD_SIZE, &bin_str_IR);
+			int_to_binary_str(effective_address, PDP8_ADDR_SIZE, &bin_str_EAddr);
+			int_to_binary_str(memval_eaddr, PDP8_WORD_SIZE, &bin_str_memval_EAddr);
+			int_to_binary_str(reg_AC, PDP8_WORD_SIZE, &bin_str_AC);
+			int_to_binary_str(reg_LR, 1, &bin_str_LR);
+			int_to_binary_str(reg_SR, PDP8_WORD_SIZE, &bin_str_SR);
+		}
+			
 		if(debug.instr) {
 			//printf("================== INSTRUCTION #%-1d : %s ==================\n",stat_instructions, curr_opcode_str);
 			printf("  VALUES BEFORE UPDATE:\n");
@@ -256,7 +260,8 @@ int main (int argc, char* argv[])
 		else if(debug.short_mode)	//Shortened version. Only want if the long version is off.  Shows changes caused at current PC by current OP.
 		{
 			printf("============== PC: %s [%4o] ===============\n", bin_str_PC, reg_PC);
-			printf("  %s   LR: %o AC: %s [%4o]\n", curr_opcode_str, reg_LR, bin_str_AC, reg_AC);
+			// This would print current values of LR/AC:
+			//printf("  %s   LR: %o AC: %s [%4o]\n", curr_opcode_str, reg_LR, bin_str_AC, reg_AC);
 			/*
 			switch (curr_opcode) {
 				case OP_AND:	printf("  AND    LR: %s AC: %s [%3x]\n", reg_LR, next_vals.AC, next_vals.AC);
@@ -279,7 +284,6 @@ int main (int argc, char* argv[])
 								break;
 			}
 			*/
-			printf("-----------------------------------------------------\n");
 		}
 		
 		// SET NEXT_PC
@@ -370,17 +374,30 @@ int main (int argc, char* argv[])
 							// Note that next_PC is passed as an argument here since PC has been pre-incremented.
 							next_vals = module_UI(reg_IR, next_PC, reg_AC, reg_LR, reg_SR, debug.module);
 							
-							printf("  UI     LR: %b AC: %b [%3x]\n", next_vals.LR, next_vals.AC, next_vals.AC);
 							// Debug Print
-							if (debug.module) printf("               NEXT PC: [%o]", next_PC);
-							if (debug.module) printf("         NEXT M[EAddr]: [%o]", next_memval_eaddr);
+							if (debug.module) {
+								printf("               NEXT PC: [%o]", next_vals.PC);
+								printf("            NEXT LR/AC: %x/%x[%o/%o]",next_vals.LR,next_vals.AC,next_vals.LR,next_vals.AC);
+							}
 							// update branch statistics, and write to branch trace file
-							write_branch_trace(fp_branchtrace, reg_PC, curr_opcode, next_PC, next_vals.flag_branch_taken, next_vals.flag_branch_type, &branch_statistics);
+							write_branch_trace(fp_branchtrace, reg_PC, curr_opcode, next_vals.PC, next_vals.flag_branch_taken, next_vals.flag_branch_type, &branch_statistics);
 							// Update Registers
-							reg_PC = next_PC;
+							reg_PC = next_vals.PC;
+							reg_AC = next_vals.AC;
+							reg_LR = next_vals.LR;
+							flag_HLT = next_vals.flag_HLT;
+							flag_NOP = next_vals.flag_NOP;
 							break;
 			default: 		fprintf(stderr,"WARNING! UNKNOWN OP CODE: %d LR: %o AC: [%o]\n", curr_opcode, reg_LR, reg_AC, reg_AC);
 							break;
+		}
+		
+		if (debug.short_mode) {
+			// get binary string of the updated AC
+			int_to_binary_str(reg_AC, PDP8_WORD_SIZE, &bin_str_AC);
+			// print updated values after executing current instruction
+			printf("  %s   LR: %o AC: %s [%4o]\n", curr_opcode_str, reg_LR, bin_str_AC, reg_AC);
+			printf("-----------------------------------------------------\n");
 		}
 		
 		// STEP 5: UPDATE STATS
@@ -435,100 +452,51 @@ int main (int argc, char* argv[])
 	}
 	// END MAIN LOOP
 	//======================================================
-/*
-//=========================================================
-// UPDATE FOR NEXT INSTRUCTION
-//---------------------------------------------------------
-
-
-
-//---------------------------------------------------------
-always@(negedge clk)
-begin
-	//---------------------------------------------------------	
-	//Increment Global Instruction Count Stats
-	//---------------------------------------------------------	
 	
 	
-	// Update modified register and memory values depending on outputs
-	// from the active opcode module for this instruction.
-	case(mem_array[PC][0:2])
+	//======================================================
+	// PRINT OUT STATISTICS AND MEMORY IMAGE
+	//----------------------------------------
+	// Print words in memory at all valid memory locations.
+	if (debug.mem_display) {
+		printf(" \n");
+		printf("=====================================================\n");
+		printf(" RESULTING MEMORY: \n");
+		for(i = 0; i <= MEM_ARRAY_MAX; i=i+1) {
+			if (mem_array[i].valid != 0)
+					printf("Address: %3x [%4o] Value: %3x [%4o]\n", i, i, mem_array[i].value,mem_array[i].value); 
+		}
+		printf("=====================================================\n");
+	}
 
-		default:	//UI
-			begin
-				if(DEBUG)
-				begin
-					printf("VALUES AFTER UPDATE [OP_UI]:");
-					printf("               NEXT PC: %b [%h]", nextPC7, nextPC7);
-					printf("               NEXT AC: %b [%h]", nextAC7, nextAC7);
-					printf("               NEXT LR: %12b [%h]", nextLINK7, nextLINK7);  
-					printf("               NEXT SR: %b [%h]", nextSR7, nextSR7);
-					printf("----------------------------------------------------");
-				end
-				
-				// write to branch trace file BEFORE update of PC,
-				// ONLY if a grp 2 skip instruction was specified 
-				if (flag_grp2_skip_instr)
-					branch_check = branchtrace(PC, mem_array[PC][0:2], flag_branch_taken7, nextPC7);
-				
-				//Update Changes to Registers
-				PC = nextPC7;		//Program Counter
-				LINK = nextLINK7;	//Link Bit
-				AC = nextAC7;		//Accumulator
-				SR = nextSR7;		//Console Switch Register
-				
-				
-			end
-	endcase
+	printf(" \n");
+	//printf("=====================================================\n");
+	printf("\nSTATISTICS\n");
+	printf("CPU Clocks Used: %-1d\n", stat_clocks);	// left-aligned
+	printf("Total Instructions: %-1d\n", stat_instructions);  // left-aligned
+	printf("Number of Instructions by Type:\n");
+	printf("	AND: %d\n", stat_and);
+	printf("	TAD: %d\n", stat_tad);
+	printf("	ISZ: %d\n", stat_isz);
+	printf("	DCA: %d\n", stat_dca);
+	printf("	JMS: %d\n", stat_jms);
+	printf("	JMP: %d\n", stat_jmp);
+	printf("	 IO: %d\n", stat_io);
+	printf("	 UI: %d\n", stat_ui);
+	printf("=====================================================\n");
+	printf("\nBRANCH STATISTICS\n");
+	printf("Total Number of Unconditional Branches Taken: %d\n",branch_statistics.total_uncond_t_count);
+	printf("         JMS Branches Taken: %d\n",branch_statistics.JMS_t_count);
+	printf("         JMP Branches Taken: %d\n",branch_statistics.JMP_t_count);
+	printf("   Uncond UI Branches Taken: %d\n",branch_statistics.UI_uncond_t_count);
+	printf("Total Number of Conditional Branches Taken: %d out of %d\n",branch_statistics.total_cond_t_count,(branch_statistics.total_cond_t_count + branch_statistics.total_cond_nt_count));
+	printf("         ISZ Branches Taken: %d out of %d\n",branch_statistics.ISZ_t_count,(branch_statistics.ISZ_t_count+branch_statistics.ISZ_nt_count));
+	printf("     Cond UI Branches Taken: %d out of %d\n",branch_statistics.UI_cond_t_count,(branch_statistics.UI_cond_t_count+branch_statistics.UI_cond_nt_count));
+	printf("=====================================================\n");
+	// END PRINTING OF STATISTICS
+	//======================================================
 	
-	//--------------------------------------------------
-	// Check if the microinstruction for HLT was given,
-	// indicated by this flag from the ui module.
-	// If HLT, then print out statistics and stop.
-	if(flag_HLT7)
-	begin
-		// print out memory image at end of program
-		if(DEBUG_MEM_DISPLAY)
-		begin
-			printf(" ");
-			printf("=====================================================");
-			printf(" RESULTING MEMORY: ");
-			for(i = 0; i <= mem_array_max; i=i+1)
-			begin
-				//if(mem_array[i]!=0)
-				if (mem_array_valid[i] != 0)
-					printf("Address: %3h [%4o] Value: %h [%o]", i, i, mem_array[i],mem_array[i]); 
-			end
-			printf("=====================================================");
-		end
 	
-		printf(" ");
-		//printf("=====================================================");
-		printf("\nSTATISTICS");
-		printf("CPU Clocks Used: %-1d", stat_clocks);	// left-aligned
-		printf("Total Instructions: %-1d", stat_instructions);  // left-aligned
-		printf("Number of Instructions by Type:");
-		printf("	AND: %d", stat_and);
-		printf("	TAD: %d", stat_tad);
-		printf("	ISZ: %d", stat_isz);
-		printf("	DCA: %d", stat_dca);
-		printf("	JMS: %d", stat_jms);
-		printf("	JMP: %d", stat_jmp);
-		printf("	 IO: %d", stat_io);
-		printf("	 UI: %d", stat_ui);
-		printf("=====================================================");
-		$fclose(tracehandle);
-		$fclose(branch_handle);
-		$stop;
-	end	
-	
-
-end
-//---------------------------------------------------------
-// UPDATE FOR NEXT INSTRUCTION
-//=========================================================
-*/
-
 	// close the trace files
 	fclose(fp_tracefile);
 	fclose(fp_branchtrace);

@@ -121,6 +121,9 @@ typedef struct _debug_flags {
 
 // STRUCT definition for branch statistics
 typedef struct _branch_stats {
+	int total_cond_t_count;		// total number of taken conditional branches
+	int total_cond_nt_count;	// total number of not-taken conditional branches
+	int total_uncond_t_count;	// total number of taken unconditional branches
 	int ISZ_t_count;			// number of ISZ branches taken
 	int JMS_t_count;			// number of JMS branches taken (unconditional)
 	int JMP_t_count;			// number of JMP branches taken (unconditional)
@@ -348,21 +351,25 @@ void write_branch_trace(FILE* fp_branchtrace, short int PC, char opcode, short i
 			if (flag_branch_taken == BT_TAKEN) {
 				fprintf(fp_branchtrace, "%x [%o]    CONDITIONAL [ISZ]   TAKEN              %x [%o]\n", PC, PC, target_address, target_address);
 				(branch_stats->ISZ_t_count)++;
+				(branch_stats->total_cond_t_count)++;
 			}
 			else {
 				fprintf(fp_branchtrace, "%x [%o]    CONDITIONAL [ISZ]   NOT TAKEN          %x [%o]\n", PC, PC, target_address, target_address);
 				(branch_stats->ISZ_nt_count)++;
+				(branch_stats->total_cond_nt_count)++;
 			}
 			break;
 		
 		case OP_JMS:
 			fprintf(fp_branchtrace, "%x [%o]    UNCONDITIONAL [JMS] TAKEN              %x [%o]\n", PC, PC, target_address, target_address);
 			(branch_stats->JMS_t_count)++;
+			(branch_stats->total_uncond_t_count)++;
 			break;
 		
 		case OP_JMP:
 			fprintf(fp_branchtrace, "%x [%o]    UNCONDITIONAL [JMP] TAKEN              %x [%o]\n", PC, PC, target_address, target_address);
 			(branch_stats->JMP_t_count)++;
+			(branch_stats->total_uncond_t_count)++;
 			break;
 			
 		case OP_UI:
@@ -370,6 +377,7 @@ void write_branch_trace(FILE* fp_branchtrace, short int PC, char opcode, short i
 				if (flag_branch_taken == BT_TAKEN) {
 					fprintf(fp_branchtrace, "%x [%o]    UNCONDITIONAL [UI]  TAKEN              %x [%o]\n", PC, PC, target_address, target_address);
 					(branch_stats->UI_uncond_t_count)++;
+					(branch_stats->total_uncond_t_count)++;
 				}
 				else {
 					fprintf(fp_branchtrace, "%x [%o]    UNCONDITIONAL [UI]  NOT TAKEN          %x [%o]\n", PC, PC, target_address, target_address);
@@ -381,10 +389,12 @@ void write_branch_trace(FILE* fp_branchtrace, short int PC, char opcode, short i
 				if (flag_branch_taken == BT_TAKEN) {
 					fprintf(fp_branchtrace, "%x [%o]    CONDITIONAL [UI]    TAKEN              %x [%o]\n", PC, PC, target_address, target_address);
 					(branch_stats->UI_cond_t_count)++;
+					(branch_stats->total_cond_t_count)++;
 				}
 				else {
 					fprintf(fp_branchtrace, "%x [%o]    CONDITIONAL [UI]    NOT TAKEN          %x [%o]\n", PC, PC, target_address, target_address);
 					(branch_stats->UI_cond_nt_count)++;
+					(branch_stats->total_cond_nt_count)++;
 				}
 			}
 			break;
@@ -720,6 +730,10 @@ s_updated_vals module_UI (short int IR, short int PC, short int AC, char LR, sho
 {
 	s_updated_vals ret_vals;	// return value struct
 	char flag_skip_instr = 0;	// flag indicating if next instruction should be skipped
+	char[16] str_skip_check = ""; // temporary string value used to indicate the type of skip conditions that were checked
+	char[16] str_skip_type = "";  // string to hold the skip types for debug print
+	short int tmp_val = 0;		// temporary value used in calculating result for RAR/RAL operations
+	short int tmp_rotate = 0;	// temporary value used for result of rotation.
 	ret_vals.PC = PC;	// initialize all return values
 	ret_vals.AC = AC;
 	ret_vals.LR = LR;
@@ -761,7 +775,7 @@ s_updated_vals module_UI (short int IR, short int PC, short int AC, char LR, sho
 		
 		// if bits IR[4:11] == 0, then the instruction is a NOP
 		if ( (IR << 4) == 0) {
-			ret_vals.flag_NOP = 1;
+			ret_vals.flag_NOP = TRUE;
 		}
 		else {
 			// Sequence 1: CLA/CLL
@@ -816,15 +830,296 @@ s_updated_vals module_UI (short int IR, short int PC, short int AC, char LR, sho
 			}
 			
 			// Sequence 4: RAR/RAL
-			
-		}
+			// Check if bits 8 and 9 have been set simultaneously: if so, this
+			// is an invalid instruction, since a rotate right and rotate left has
+			// been simultaneously indicated. Print a warning, but allow instruction 
+			// to "execute" since performing the right and left rotate will cancel 
+			// each other out and leave the AC unchanged.
+			if ((((IR >> (PDP8_WORD_SIZE - 8-1)) & 1) == 1) && ((IR >> (PDP8_WORD_SIZE - 9-1)) == 1))
+			{
+				fprintf(stderr,"WARNING: Micro Op instruction conflict at PC = [%o]. Rotate Left and Rotate Right enabled simultaneously.", PC);
+			}
+			// Rotate right:
+			// Check bit 8, which indicates a rotate right operation
+			if (((IR >> (PDP8_WORD_SIZE - 8-1)) & 1) == 1) {
+				// Let tmp_val be set to the concatenation of LR and AC, 
+				// {LR,AC}
+				tmp_val = (ret_vals.LR << PDP8_WORD_SIZE) + ret_vals.AC;
+				
+				// Rotate right:
+				// Check if bit 10 is 0: If so, only need to rotate one bit position
+				if (((IR >> (PDP8_WORD_SIZE - 10-1)) & 1) == 0) {
+					// First make the most significant bit of tmp_rotate
+					// equal to the least significant bit of tmp_val
+					tmp_rotate = (tmp_val & 1) << PDP8_WORD_SIZE;
+					// Then OR the remaining more significant bits of tmp_val
+					// with tmp_rotate
+					tmp_rotate = tmp_rotate | (tmp_val >> 1);
+					
+					// Next, the new value of LR should be the most significant
+					// bit of tmp_rotate, and the AC should be set to all the 
+					// less significant bits of tmp_rotate.
+					ret_vals.LR = (tmp_rotate >> PDP8_WORD_SIZE);
+					ret_vals.AC = (tmp_rotate & word_mask);
+					
+					// Print out new calculated values
+					if (debug) {
+						printf(" -- Rotate Accumulator and Link Right\n");
+						printf("                NEW LR: %x [%o]\n", ret_vals.LR, ret_vals.LR);
+						printf("                NEW AC: %x [%o]\n", ret_vals.AC, ret_vals.AC);
+					}
+				}
+				else { // Otherwise bit 10 (the 0/1 bit) is 1 --> rotate 2 positions right
+					// First set the two most significant bits of tmp_rotate
+					// equal to the two least significant bits of tmp_val
+					tmp_rotate = (tmp_val & 3) << (PDP8_WORD_SIZE-1);
+					// Then OR the remaining more significant bits of tmp_val
+					// with tmp_rotate
+					tmp_rotate = tmp_rotate | (tmp_val >> 2);
+					
+					// Next, the new value of LR should be the most significant
+					// bit of tmp_rotate, and the AC should be set to all the 
+					// less significant bits of tmp_rotate.
+					ret_vals.LR = (tmp_rotate >> PDP8_WORD_SIZE);
+					ret_vals.AC = (tmp_rotate & word_mask);
+					
+					// Print out new calculated values
+					if (debug) {
+						printf(" -- Rotate Accumulator and Link Right\n");
+						printf("                NEW LR: %x [%o]\n", ret_vals.LR, ret_vals.LR);
+						printf("                NEW AC: %x [%o]\n", ret_vals.AC, ret_vals.AC);
+					}
+				}
+			} // end rotate right
+				
+			// Rotate left:
+			// Check if bit 9 is 0: RAL
+			if (((IR >> (PDP8_WORD_SIZE - 9-1)) & 1) == 0) {
+				// Check if bit 10 is 0: If so, only need to rotate one bit position
+				if (((IR >> (PDP8_WORD_SIZE - 10-1)) & 1) == 0) {
+					// First set the least significant bit of tmp_rotate to be
+					// the most significant of tmp_val.
+					tmp_rotate = (tmp_val >> PDP8_WORD_SIZE);
+					// Then OR tmp_rotate with all the remaining bits of tmp_val
+					// after shifting them left one position.
+					tmp_rotate = tmp_rotate | ((tmp_val & word_mask) << 1);
+					// Next, the new value of LR should be the most significant
+					// bit of tmp_rotate, and the AC should be set to all the 
+					// less significant bits of tmp_rotate.
+					ret_vals.LR = (tmp_rotate >> PDP8_WORD_SIZE);
+					ret_vals.AC = (tmp_rotate & word_mask);
+					
+					// Print out new calculated values
+					if (debug) {
+						printf(" -- Rotate Accumulator and Link Left\n");
+						printf("                NEW LR: %x [%o]\n", ret_vals.LR, ret_vals.LR);
+						printf("                NEW AC: %x [%o]\n", ret_vals.AC, ret_vals.AC);
+					}
+				}
+				else { // Otherwise bit 10(the 0/1 bit) is 1 --> rotate 2 positions left
+					// First set the two least significant bits of tmp_rotate to be
+					// the least significant two of tmp_val
+					tmp_rotate = (tmp_val >> (PDP8_WORD_SIZE - 1));
+					// Then OR tmp_rotate with all remaining bits of tmp_val
+					// after shifting them left two positions. Actually, what 
+					// is done here: shift tmp_val to the left 1 bit and AND 
+					// result with word_mask to set the most significant two 
+					// bits to 0, then shift left one more bit position, so that
+					// the next most significant bit will have been shifted two
+					// bits left.
+					tmp_rotate = tmp_rotate | (((tmp_val << 1) & word_mask) << 1);
+					
+					// Next, the new value of LR should be the most significant
+					// bit of tmp_rotate, and the AC should be set to all the 
+					// less significant bits of tmp_rotate.
+					ret_vals.LR = (tmp_rotate >> PDP8_WORD_SIZE);
+					ret_vals.AC = (tmp_rotate & word_mask);
+					
+					// Print out new calculated values
+					if (debug) {
+						printf(" -- Rotate Accumulator and Link Left Twice\n");
+						printf("                NEW LR: %x [%o]\n", ret_vals.LR, ret_vals.LR);
+						printf("                NEW AC: %x [%o]\n", ret_vals.AC, ret_vals.AC);
+					}
+				}
+			} // end rotate left operation
+		} // End sequence 1-4 operations
 	} // End Group 1 Microinstructions section
-	else if () {
-		// Group 2 Microinstructions
-	}
-	else {
-		
-	}
+	else // Bit 3 is 1, indicating either Group 2 or 3 Microinstructions
+	{
+		// Check if bit 11 is 0: Group 2 Microinstructions
+		if (((IR >> (PDP8_WORD_SIZE - 11-1)) & 1) == 0) {
+			// debug print
+			if (debug) {
+				printf("                  cla sma sza snl 0/1 osr hlt\n");
+				printf(" \n");
+				printf(" Group 2 Microinstructions:\n");
+			}
+			
+			// Check if bit 8 is set to 0: 
+			// OR subgroup
+			if (((IR >> (PDP8_WORD_SIZE - 8-1)) & 1) == 0) {
+				// check if any of bits 5 through 7 were set, indicating
+				// that an OR skip condition was to be checked (this instruction
+				// should be flagged as a conditional branch instruction)
+				if (((IR >> (PDP8_WORD_SIZE - 7-1)) & 7) != 0) {
+					ret_vals.flag_branch_type = BT_CONDITIONAL;
+				}
+				
+				// SMA - Skip on Minus Accumulator: check bit 5
+				if (((IR >> (PDP8_WORD_SIZE - 5-1)) & 1) == 0) {
+					// if most significant bit of AC is 1, then skip
+					if ((ret_vals.AC >> (PDP8_WORD_SIZE - 1)) == 1) {
+						flag_skip_instr = 1;
+						strcat(&str_skip_type," SMA");
+					}
+					strcat(&str_skip_check," SMA");
+				}
+				
+				// SZA - Skip on Zero Accumulator: check bit 6
+				if (((IR >> (PDP8_WORD_SIZE - 6-1)) & 1) == 0) {
+					// if AC is 0, then skip
+					if (ret_vals.AC == 0) {
+						flag_skip_instr = 1;
+						strcat(&str_skip_type," SZA");
+					}
+					strcat(&str_skip_check," SZA");
+				}
+				
+				// SNL - Skip on Nonzero Link: check bit 7
+				if (((IR >> (PDP8_WORD_SIZE - 7-1)) & 1) == 0) {
+					// if LR is not 0, then skip
+					if (ret_vals.LR != 0) {
+						flag_skip_instr = 1;
+						strcat(&str_skip_type," SNL");
+					}
+					strcat(&str_skip_check," SNL");
+				}
+			
+				// debug print: indicating if any of the OR skip conditions were met
+				if ((debug) && (ret_vals.flag_branch_type == BT_CONDITIONAL)) {
+					if (flag_skip_instr) {
+						printf(" -- OR group condition(s) met:%s\n",str_skip_type);
+					}
+					else {
+						printf(" -- OR group condition(s) not met.\n");
+					}
+					printf("    Checked for: %s\n", str_skip_check);
+				}
+				
+			} // end OR subgroup
+			else // otherwise bit 8 = 1: indicating AND subgroup
+			{
+				// check if bits [5:7] were all zero: Skip Always should be 
+				// flagged as an unconditional branch. 
+				if (((IR >> (PDP8_WORD_SIZE - 7-1)) & 7) == 0) {
+					ret_vals.flag_branch_type = BT_UNCONDITIONAL;
+					str_skip_check = "None. (Unconditional branch)";
+				}
+				else {
+					// Otherwise, it is a conditional branch.
+					ret_vals.flag_branch_type = BT_CONDITIONAL;
+				}
+				
+				// set skip flag to true initially
+				flag_skip_instr = 1; 
+				
+				// Note that for the AND section, str_skip_type is used 
+				// to indicate the conditions that failed.
+				
+				// SPA - Skip on Positive Accumulator: check bit 5
+				if (((IR >> (PDP8_WORD_SIZE - 5-1)) & 1) == 0) {
+					// if most significant bit of AC is not 0, then 
+					// then AC is negative, and condition is not met
+					if ((ret_vals.AC >> (PDP8_WORD_SIZE - 1)) == 1) {
+						flag_skip_instr = 0;
+						strcat(&str_skip_type," SPA");
+					} 
+					strcat(&str_skip_check," SPA");
+				}
+				
+				// SNA - Skip on Nonzero Accumulator: check bit 6
+				if (((IR >> (PDP8_WORD_SIZE - 6-1)) & 1) == 0) {
+					// if AC is 0, then condition was not met, so
+					// do not skip
+					if (ret_vals.AC == 0) {
+						flag_skip_instr = 0;
+						strcat(&str_skip_type," SNA");
+					}
+					strcat(&str_skip_check," SNA");
+				}
+				
+				// SZL - Skip on Zero Link: check bit 7
+				if (((IR >> (PDP8_WORD_SIZE - 7-1)) & 1) == 0) {
+					// if LR is non-zero, then condition not satisfied,
+					// so do not skip
+					if (ret_vals.LR != 0) {
+						flag_skip_instr = 0;
+						strcat(&str_skip_type," SZL");
+					}
+					strcat(&str_skip_check," SZL");
+				}
+			
+				// debug print: indicating if any of the OR skip conditions were met
+				if ((debug) && (ret_vals.flag_branch_type != BT_NOT_TAKEN)) {
+					if (flag_skip_instr) {
+						printf(" -- AND group condition(s) met.\n");
+					}
+					else {
+						printf(" -- AND group condition(s) not met: %s\n", str_skip_type);
+					}
+					printf("    Checked for: %s\n", str_skip_check);
+				}
+				
+			} // end AND subgroup
+			
+			// if the flag_skip_instr variable was set, 
+			// then increment PC by 1
+			if (flag_skip_instr) {
+				ret_vals.PC++;
+			}
+			
+			// CLA - Clear Accumulator: check if bit 4 is set
+			if (((IR >> (PDP8_WORD_SIZE - 4-1)) & 1) == 1) {
+				ret_vals.AC = 0;
+				if (debug) {
+					printf(" -- CLA - Clear Accumulator\n");
+					printf("                NEW AC: %x [%o]", ret_vals.AC, ret_vals.AC);
+				}
+			}
+			
+			// OSR - Or Switch Register with Accumulator: check if bit 9 is set
+			if (((IR >> (PDP8_WORD_SIZE - 9-1)) & 1) == 1) {
+				if (debug) {
+					printf(" -- OSR - Or Switch Register with Accumulator\n");
+					printf("           Previous AC: %x [%o]\n", ret_vals.AC, ret_vals.AC);
+					printf("           Previous SR: %x [%o]\n", ret_vals.SR, ret_vals.SR);
+				}
+				
+				ret_vals.AC = ret_vals.AC | ret_vals.SR;
+				
+				if (debug) printf("                NEW AC: %x [%o]\n", ret_vals.AC, ret_vals.AC);
+			}
+			
+			// HLT - HaLT: check if bit 10 is set
+			if (((IR >> (PDP8_WORD_SIZE - 10-1)) & 1) == 1) {
+				if (debug) {
+					printf(" -- HLT - Halt\n");
+				}
+				
+				ret_vals.flag_HLT = TRUE; // set halt flag
+			}
+			
+		} // End Group 2 Microinstructions
+		else { // Bit 11 is set to 1: Group 3 Microinstructions
+			// These are not implemented, so should be noted as 
+			// illegal/unrecognized instructions
+			fprintf(stderr,"WARNING: Group 3 MicroOp called at PC = [%o]. Group 3 MicroOps not enabled in simulation.\n", PC);
+			// Note that next values were initialized to be equal to current values,
+			// so no changes will be made to the registers. (Except for the pre-incremented PC,
+			// which will just go to the next instruction as it should.)
+		} // End Group 3 Microinstructions
+	} // End Group 2 and 3 Microinstructions section
 		
 	return ret_vals; // return updated values
 }
