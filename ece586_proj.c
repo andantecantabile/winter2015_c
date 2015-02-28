@@ -67,7 +67,7 @@ s_debug_flags debug;				// Debug Flags
 s_branch_stats branch_statistics; 	// Branch Statistics tracking
 
 // - Debug Print Strings:
-char curr_opcode_str [10];
+char curr_opcode_str [DEBUG_STR_LEN];
 char bin_str_PC [PDP8_ADDR_SIZE];
 char bin_str_next_PC [PDP8_ADDR_SIZE];
 char bin_str_IR [PDP8_WORD_SIZE];
@@ -100,13 +100,11 @@ int main (int argc, char* argv[])
 	short int next_PC = 0;
 	short int next_AC = 0;	
 	short int next_LR = 0;
-	short int next_SR = 0;
+	//short int next_SR = 0;
 	s_updated_vals next_vals;	// struct that holds return values from modules
 	// - Flags:
 	char flag_HLT = 0; 	// halt flag from group 2 microinstructions
-	char flag_NOP = 0;	// flag to indicate a NOP for invalid instruction 
-	char flag_GRP2_SKP_UNCOND = 0;	// set to 1 if the SKIP ALL grp 2 micro instruction was given
-	char flag_GRP2_SKP = 0;		// set to 1 if any other skip grp 2 microinstruction was given.
+	//char flag_NOP = 0;	// flag to indicate a NOP for invalid instruction 
 	char flag_branch_taken = 0;	// set to 1 if a branch was taken
 	// - Debug Flags:
 	debug.mem_display = 0;
@@ -213,35 +211,35 @@ int main (int argc, char* argv[])
 		//--------------------------------
 		// Set opcode string.
 		switch (curr_opcode) {
-			case OP_AND:	curr_opcode_str = "AND";
+			case OP_AND:	strncpy(curr_opcode_str,"AND",DEBUG_STR_N);
 							break;
-			case OP_TAD:	curr_opcode_str = "TAD";
+			case OP_TAD:	strncpy(curr_opcode_str,"TAD",DEBUG_STR_N);
 							break;
-			case OP_ISZ:	curr_opcode_str = "ISZ";
+			case OP_ISZ:	strncpy(curr_opcode_str,"ISZ",DEBUG_STR_N);
 							break;
-			case OP_DCA:	curr_opcode_str = "DCA";
+			case OP_DCA:	strncpy(curr_opcode_str,"DCA",DEBUG_STR_N);
 							break;
-			case OP_JMS:	curr_opcode_str = "JMS";
+			case OP_JMS:	strncpy(curr_opcode_str,"JMS",DEBUG_STR_N);
 							break;
-			case OP_JMP:	curr_opcode_str = "JMP";
+			case OP_JMP:	strncpy(curr_opcode_str,"JMP",DEBUG_STR_N);
 							break;
-			case OP_IO:		curr_opcode_str = "IO ";
+			case OP_IO:		strncpy(curr_opcode_str,"IO ",DEBUG_STR_N);
 							break;
-			case OP_UI:		curr_opcode_str = "UI ";
+			case OP_UI:		strncpy(curr_opcode_str,"UI ",DEBUG_STR_N);
 							break;
-			default:		curr_opcode_str = "ILLEGAL OP";
+			default:		strncpy(curr_opcode_str,"ILLEGAL OP",DEBUG_STR_N);
 							break;
 		}
 		
 		if (debug.instr || debug.short_mode) {
 			// Get binary values of initial values
-			int_to_binary_str(reg_PC, PDP8_ADDR_SIZE, &bin_str_PC);
-			int_to_binary_str(reg_IR, PDP8_WORD_SIZE, &bin_str_IR);
-			int_to_binary_str(effective_address, PDP8_ADDR_SIZE, &bin_str_EAddr);
-			int_to_binary_str(memval_eaddr, PDP8_WORD_SIZE, &bin_str_memval_EAddr);
-			int_to_binary_str(reg_AC, PDP8_WORD_SIZE, &bin_str_AC);
-			int_to_binary_str(reg_LR, 1, &bin_str_LR);
-			int_to_binary_str(reg_SR, PDP8_WORD_SIZE, &bin_str_SR);
+			int_to_binary_str(reg_PC, PDP8_ADDR_SIZE, (char**)&bin_str_PC);
+			int_to_binary_str(reg_IR, PDP8_WORD_SIZE, (char**)&bin_str_IR);
+			int_to_binary_str(effective_address, PDP8_ADDR_SIZE, (char**)&bin_str_EAddr);
+			int_to_binary_str(memval_eaddr, PDP8_WORD_SIZE, (char**)&bin_str_memval_EAddr);
+			int_to_binary_str(reg_AC, PDP8_WORD_SIZE, (char**)&bin_str_AC);
+			int_to_binary_str(reg_LR, 1, (char**)&bin_str_LR);
+			int_to_binary_str(reg_SR, PDP8_WORD_SIZE, (char**)&bin_str_SR);
 		}
 			
 		if(debug.instr) {
@@ -249,7 +247,7 @@ int main (int argc, char* argv[])
 			printf("  VALUES BEFORE UPDATE:\n");
 			printf("                  PC / IR: %s [%4o] / %s [%4o]\n", bin_str_PC, reg_PC, bin_str_IR, reg_IR);
 			printf("EFFECTIVE ADDRESS / VALUE: %s [%4o] / %s [%4o]\n", bin_str_EAddr, effective_address, bin_str_memval_EAddr, memval_eaddr);
-			printf("       LINK REGISTER [LR]: %1o   ACCUMULATOR [AC]: %s [%4o]\n", bin_str_LR, reg_LR, bin_str_AC, reg_AC);
+			printf("       LINK REGISTER [LR]: %1o   ACCUMULATOR [AC]: %s [%4o]\n", reg_LR, bin_str_AC, reg_AC);
 			printf("     SWITCH REGISTER [SR]: %s [%4o]\n", bin_str_SR, reg_SR);
 			//printf("                    IR: %s [%3x]\n", bin_str_IR,reg_IR);
 			//printf("                OPCODE: %12.3s [%3x]\n", curr_opcode_str, curr_opcode);
@@ -307,7 +305,7 @@ int main (int argc, char* argv[])
 							// LR is inverted if the above addition operation results in carry out
 							next_AC = reg_AC + memval_eaddr;
 							if ((next_AC >> PDP8_WORD_SIZE) != 0) {
-								next_LR = LR ^ 1; // this will flip the least significant bit of the LR.
+								next_LR = reg_LR ^ 1; // this will flip the least significant bit of the LR.
 							}
 							next_AC = next_AC & word_mask; 	// then clear higher-order bits in next_AC beyond
 															// the size of the word
@@ -338,7 +336,7 @@ int main (int argc, char* argv[])
 							reg_PC = next_PC;
 							break;
 			case OP_DCA:  	// write AC to memory
-							write_mem(effective_address, AC, &mem_array[0], fp_tracefile);
+							write_mem(effective_address, reg_AC, &mem_array[0], fp_tracefile);
 							next_AC = 0;
 							// Debug Print
 							if (debug.module) printf("               NEXT AC: [%o]", next_AC);
@@ -368,7 +366,7 @@ int main (int argc, char* argv[])
 			case OP_IO:   	// Not implemented.
 							fprintf(stderr,"WARNING: IO instruction encountered at PC: [%o]\n",reg_PC);
 							// Update Registers
-							PC = next_PC;
+							reg_PC = next_PC;
 							break;
 			case OP_UI:   	// Obtain next values from the UI subroutine
 							// Note that next_PC is passed as an argument here since PC has been pre-incremented.
@@ -386,15 +384,14 @@ int main (int argc, char* argv[])
 							reg_AC = next_vals.AC;
 							reg_LR = next_vals.LR;
 							flag_HLT = next_vals.flag_HLT;
-							flag_NOP = next_vals.flag_NOP;
 							break;
-			default: 		fprintf(stderr,"WARNING! UNKNOWN OP CODE: %d LR: %o AC: [%o]\n", curr_opcode, reg_LR, reg_AC, reg_AC);
+			default: 		fprintf(stderr,"WARNING! UNKNOWN OP CODE: %d LR: %o AC: %x [%o]\n", curr_opcode, reg_LR, reg_AC, reg_AC);
 							break;
 		}
 		
 		if (debug.short_mode) {
 			// get binary string of the updated AC
-			int_to_binary_str(reg_AC, PDP8_WORD_SIZE, &bin_str_AC);
+			int_to_binary_str(reg_AC, PDP8_WORD_SIZE, (char**)&bin_str_AC);
 			// print updated values after executing current instruction
 			printf("  %s   LR: %o AC: %s [%4o]\n", curr_opcode_str, reg_LR, bin_str_AC, reg_AC);
 			printf("-----------------------------------------------------\n");
@@ -462,6 +459,7 @@ int main (int argc, char* argv[])
 		printf(" \n");
 		printf("=====================================================\n");
 		printf(" RESULTING MEMORY: \n");
+		int i;
 		for(i = 0; i <= MEM_ARRAY_MAX; i=i+1) {
 			if (mem_array[i].valid != 0)
 					printf("Address: %3x [%4o] Value: %3x [%4o]\n", i, i, mem_array[i].value,mem_array[i].value); 

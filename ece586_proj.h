@@ -72,6 +72,9 @@
 #define OP_IO  6
 #define OP_UI  7
 
+// DEBUG PRINT STATEMENTS
+#define DEBUG_STR_LEN 30
+#define DEBUG_STR_N DEBUG_STR_LEN-1
 //---------------------------	
 // END PARAMETER SECTION
 //=========================================================
@@ -150,7 +153,7 @@ typedef struct _branch_stats {
 // Return Value: No direct return value; the binary string
 //    is returned by reference in the argument list.
 //---------------------------------------------------------	
-void int_to_binary_str(int x, int max_digits, char* str_binary)
+void int_to_binary_str(int x, int max_digits, char* str_binary[])
 {
 	// y is a comparison value, initialized to the integer
 	// number that has a '1' in the most significant bit
@@ -163,10 +166,10 @@ void int_to_binary_str(int x, int max_digits, char* str_binary)
 		for (; y > 0; y = y >> 1)
 		{
 			if ((x & y) == y) {
-				*(str_binary+i) = '1';
+				*(char*)(str_binary+i) = '1';
 			}
 			else {
-				*(str_binary+i) = '0';
+				*(char*)(str_binary+i) = '0';
 			}
 			i++; // increment the array position
 		}
@@ -307,7 +310,7 @@ void load_memory_array(s_mem_word* ptr_mem_array, char* input_filename, char DEB
 void read_param_file(s_debug_flags* ptr_debug, char* param_filename)
 {
 	FILE* fp_paramfile;	// file handle for param file
-	char c;
+	//char c;
 	
 	// Open the input file to read in debug parameters.
 	if ((fp_paramfile = fopen(param_filename, "r")) == NULL) {
@@ -507,6 +510,7 @@ s_effective_addr calc_eaddr(short int reg_IR, short int reg_PC, s_mem_word* ptr_
 	short int EffectiveAddress; // temporary EAddr value 
 	short int IndirectAddrLoc;  // temp value used for indirect mode
 	short int CurrentPage;		// current page of the given PC, used in current page mode
+	short int CurrentOffset;	// current offset 
 	// initialize output flags for indirect and auto-indexing to be false
 	ret_EAddr.flag_MemType_Indirect = FALSE;
 	ret_EAddr.flag_MemType_AutoIndex = FALSE;
@@ -530,25 +534,25 @@ s_effective_addr calc_eaddr(short int reg_IR, short int reg_PC, s_mem_word* ptr_
 	
 	// Check if the opcode of the current instruction is a memory reference 
 	// instruction (opcodes 0 to 5).
-	if (curr_opcode >= 0) && (curr_opcode <= 5)) {
+	if ((curr_opcode >= 0) && (curr_opcode <= 5)) {
 		// strings for effective address and current instruction for debug
 		char* p_str_EAddr = malloc(PDP8_ADDR_SIZE*sizeof(char));
-		if (p_str_EAddr == null) {
+		if (p_str_EAddr == NULL) {
 			fprintf(stderr,"malloc() for p_str_EAddr failed in calc_eaddr()\n");
 			exit(-1);
 		}
 		char* p_str_IndirectAddr = malloc(PDP8_ADDR_SIZE*sizeof(char));
-		if (p_str_IndirectAddr == null) {
+		if (p_str_IndirectAddr == NULL) {
 			fprintf(stderr,"malloc() for p_str_IndirectAddr failed in calc_eaddr()\n");
 			exit(-1);
 		}
 		char* p_str_IR = malloc(PDP8_WORD_SIZE*sizeof(char));
-		if (p_str_IR == null) {
+		if (p_str_IR == NULL) {
 			fprintf(stderr,"malloc() for p_str_IR failed in calc_eaddr()\n");
 			exit(-1);
 		}
 		// convert the given IR to a binary string for debug
-		int_to_binary_str(reg_IR, PDP8_WORD_SIZE, p_str_IR);
+		int_to_binary_str(reg_IR, PDP8_WORD_SIZE, &p_str_IR);
 		
 		// determine the current page from the PC
 		CurrentPage = reg_PC & page_mask;
@@ -556,10 +560,9 @@ s_effective_addr calc_eaddr(short int reg_IR, short int reg_PC, s_mem_word* ptr_
 		CurrentOffset = reg_IR & offset_mask;
 		
 		// Debug Initial Prints:
-		if (debug)
-		begin
+		if (debug) {
 			printf("BEGIN EFFECTIVE ADDRESS CALC:");
-			printf("         CURRENT INSTR: %s [%o]", *p_str_IR, reg_IR);
+			printf("         CURRENT INSTR: %s [%o]", p_str_IR, reg_IR);
 			printf(" ");
 			printf("   0   1   2   3   4   5   6   7   8   9  10  11");
 			printf(" +---+---+---+---+---+---+---+---+---+---+---+---+");
@@ -571,7 +574,7 @@ s_effective_addr calc_eaddr(short int reg_IR, short int reg_PC, s_mem_word* ptr_
 			printf(" |  op-code  | I | M |      O  F  F  S  E  T     |");
 			printf(" +---+---+---+---+---+---+---+---+---+---+---+---+");
 			printf(" ");
-		end
+		}
 		
 		// Check if the Indirect Addressing bit set...
 		if ((reg_IR & indirect_addr_bit_mask) == 0)
@@ -586,11 +589,11 @@ s_effective_addr calc_eaddr(short int reg_IR, short int reg_PC, s_mem_word* ptr_
 				EffectiveAddress = CurrentOffset;
 				
 				// convert to binary string for debug print
-				int_to_binary_str(EffectiveAddress, PDP8_ADDR_SIZE, p_str_EAddr);
+				int_to_binary_str(EffectiveAddress, PDP8_ADDR_SIZE, &p_str_EAddr);
 				
 				if (debug) {
 					printf("  -- ZERO PAGE ADDRESSING --");
-					printf("     EFFECTIVE ADDRESS: %s [%o]", *p_str_EAddr, EffectiveAddress);
+					printf("     EFFECTIVE ADDRESS: %s [%o]", p_str_EAddr, EffectiveAddress);
 				}
 				//--------------------------------------------
 			}
@@ -602,11 +605,11 @@ s_effective_addr calc_eaddr(short int reg_IR, short int reg_PC, s_mem_word* ptr_
 				EffectiveAddress = CurrentPage + CurrentOffset;
 				
 				// convert to binary string for debug print
-				int_to_binary_str(EffectiveAddress, PDP8_ADDR_SIZE, p_str_EAddr);
+				int_to_binary_str(EffectiveAddress, PDP8_ADDR_SIZE, &p_str_EAddr);
 				
 				if (debug) {
 					printf("  -- CURRENT PAGE ADDRESSING --");
-					printf("     EFFECTIVE ADDRESS: %s [%o]", *p_str_EAddr, EffectiveAddress);
+					printf("     EFFECTIVE ADDRESS: %s [%o]", p_str_EAddr, EffectiveAddress);
 				}
 				//--------------------------------------------
 			}
@@ -627,13 +630,13 @@ s_effective_addr calc_eaddr(short int reg_IR, short int reg_PC, s_mem_word* ptr_
 					//EffectiveAddress = *(ptr_mem_array+IndirectAddrLoc);
 					
 					// convert to binary string for debug print
-					int_to_binary_str(EffectiveAddress, PDP8_ADDR_SIZE, p_str_EAddr);
-					int_to_binary_str(IndirectAddrLoc, PDP8_ADDR_SIZE, p_str_IndirectAddr);
+					int_to_binary_str(EffectiveAddress, PDP8_ADDR_SIZE, &p_str_EAddr);
+					int_to_binary_str(IndirectAddrLoc, PDP8_ADDR_SIZE, &p_str_IndirectAddr);
 					
 					if (debug) {
 						printf("  -- INDIRECT ADDRESSING; ZERO PAGE --");
-						printf("INDIRECT ADDR LOCATION: %s [%o]", *p_str_IndirectAddr, IndirectAddrLoc);
-						printf("     EFFECTIVE ADDRESS: %s [%o]", *p_str_EAddr, EffectiveAddress);
+						printf("INDIRECT ADDR LOCATION: %s [%o]", p_str_IndirectAddr, IndirectAddrLoc);
+						printf("     EFFECTIVE ADDRESS: %s [%o]", p_str_EAddr, EffectiveAddress);
 					}
 				}
 				else
@@ -645,13 +648,13 @@ s_effective_addr calc_eaddr(short int reg_IR, short int reg_PC, s_mem_word* ptr_
 					//EffectiveAddress = *(ptr_mem_array+IndirectAddrLoc);
 					
 					// convert to binary string for debug print
-					int_to_binary_str(EffectiveAddress, PDP8_ADDR_SIZE, p_str_EAddr);
-					int_to_binary_str(IndirectAddrLoc, PDP8_ADDR_SIZE, p_str_IndirectAddr);
+					int_to_binary_str(EffectiveAddress, PDP8_ADDR_SIZE, &p_str_EAddr);
+					int_to_binary_str(IndirectAddrLoc, PDP8_ADDR_SIZE, &p_str_IndirectAddr);
 					
 					if (debug) {
 						printf("  -- INDIRECT ADDRESSING; CURRENT PAGE --");
-						printf("INDIRECT ADDR LOCATION: %s [%o]", *p_str_IndirectAddr, IndirectAddrLoc);
-						printf("     EFFECTIVE ADDRESS: %s [%o]", *p_str_EAddr, EffectiveAddress);
+						printf("INDIRECT ADDR LOCATION: %s [%o]", p_str_IndirectAddr, IndirectAddrLoc);
+						printf("     EFFECTIVE ADDRESS: %s [%o]", p_str_EAddr, EffectiveAddress);
 					}
 				}
 			  
@@ -665,26 +668,26 @@ s_effective_addr calc_eaddr(short int reg_IR, short int reg_PC, s_mem_word* ptr_
 				//      C(AutoIndex_Register) <- C(AutoIndex_Register) + 1
 				//      EffectiveAddress <- C(AutoIndex_Register)
 				IndirectAddrLoc = CurrentOffset;
-				EffectiveAddress = *(ptr_mem_array+IndirectAddrLoc); // pre-incremented value
+				//EffectiveAddress = (ptr_mem_array+IndirectAddrLoc)->value; // pre-incremented value
 				
-				//FUNCTION CALL TO READMEM FOR LOG
-				read_mem(IndirectAddrLoc, TF_READ, ptr_mem_array, fp_tracefile);
+				// FUNCTION CALL TO READMEM to obtain effective address
+				EffectiveAddress = read_mem(IndirectAddrLoc, TF_READ, ptr_mem_array, fp_tracefile);
 				
 				// convert to binary string for debug print
-				int_to_binary_str(EffectiveAddress, PDP8_ADDR_SIZE, p_str_EAddr);
-				int_to_binary_str(IndirectAddrLoc, PDP8_ADDR_SIZE, p_str_IndirectAddr);
+				int_to_binary_str(EffectiveAddress, PDP8_ADDR_SIZE, &p_str_EAddr);
+				int_to_binary_str(IndirectAddrLoc, PDP8_ADDR_SIZE, &p_str_IndirectAddr);
 
 				if (debug)
 				{
 					printf("  -- AUTO-INDEX ADDRESSING --");
-					printf("INDIRECT ADDR LOCATION: %s [%o]", *p_str_IndirectAddr, IndirectAddrLoc);
-					printf("  Orig M[IndirectAddr]: %s [%o]", *p_str_EAddr, EffectiveAddress);
+					printf("INDIRECT ADDR LOCATION: %s [%o]", p_str_IndirectAddr, IndirectAddrLoc);
+					printf("  Orig M[IndirectAddr]: %s [%o]", p_str_EAddr, EffectiveAddress);
 				}
 				
 				// Calculate the actual incremented value to be used as the effective address
 				EffectiveAddress++; // read mem val and increment by 1
 				// convert to binary string for debug print
-				int_to_binary_str(EffectiveAddress, PDP8_ADDR_SIZE, p_str_EAddr);
+				int_to_binary_str(EffectiveAddress, PDP8_ADDR_SIZE, (char**)&p_str_EAddr);
 				
 				// Write new value to memory
 				write_mem(IndirectAddrLoc, EffectiveAddress, ptr_mem_array, fp_tracefile);
@@ -693,7 +696,7 @@ s_effective_addr calc_eaddr(short int reg_IR, short int reg_PC, s_mem_word* ptr_
 				ret_EAddr.flag_MemType_AutoIndex = TRUE;
 				
 				if (debug) {
-					printf("     EFFECTIVE ADDRESS: %s [%o]", *p_str_EAddr, EffectiveAddress);
+					printf("     EFFECTIVE ADDRESS: %s [%o]", p_str_EAddr, EffectiveAddress);
 				}
 			}
 		} // end else where indirect addressing bit = 1
@@ -730,8 +733,8 @@ s_updated_vals module_UI (short int IR, short int PC, short int AC, char LR, sho
 {
 	s_updated_vals ret_vals;	// return value struct
 	char flag_skip_instr = 0;	// flag indicating if next instruction should be skipped
-	char[16] str_skip_check = ""; // temporary string value used to indicate the type of skip conditions that were checked
-	char[16] str_skip_type = "";  // string to hold the skip types for debug print
+	char str_skip_check [DEBUG_STR_LEN] = ""; // temporary string value used to indicate the type of skip conditions that were checked
+	char str_skip_type [DEBUG_STR_LEN] = "";  // string to hold the skip types for debug print
 	short int tmp_val = 0;		// temporary value used in calculating result for RAR/RAL operations
 	short int tmp_rotate = 0;	// temporary value used for result of rotation.
 	ret_vals.PC = PC;	// initialize all return values
@@ -748,8 +751,8 @@ s_updated_vals module_UI (short int IR, short int PC, short int AC, char LR, sho
 	// number of bits
 	short int word_mask = (1 << PDP8_WORD_SIZE) - 1;
 	
-	char[WORD_STRING_SIZE] str_IR;	// string for displaying binary value of IR
-	int_to_binary_str(IR, PDP8_WORD_SIZE, &str_IR);
+	char str_IR [WORD_STRING_SIZE];	// string for displaying binary value of IR
+	int_to_binary_str(IR, PDP8_WORD_SIZE, (char**)&str_IR);
 	
 	if (debug) {
 		printf(" \n");
@@ -791,7 +794,7 @@ s_updated_vals module_UI (short int IR, short int PC, short int AC, char LR, sho
 				ret_vals.LR = 0;
 				if (debug) {
 					printf(" -- Clear Link Register\n");
-					printf("                NEW LR: [%o]\n", ret_vals.LR, ret_vals.LR);
+					printf("                NEW LR: [%o]\n", ret_vals.LR);
 				}
 			}
 			
@@ -809,7 +812,7 @@ s_updated_vals module_UI (short int IR, short int PC, short int AC, char LR, sho
 				ret_vals.LR = (ret_vals.LR) ^ 1;
 				if (debug) {
 					printf(" -- Complement Link Register");
-					printf("                NEW LR: [%o]\n", ret_vals.LR, ret_vals.LR);
+					printf("                NEW LR: [%o]\n", ret_vals.LR);
 				}
 			}
 			
@@ -825,7 +828,7 @@ s_updated_vals module_UI (short int IR, short int PC, short int AC, char LR, sho
 				if (debug) {
 					printf(" -- Complement Accumulator\n");
 					printf("                NEW AC: %3x [%4o]\n", ret_vals.AC, ret_vals.AC);
-					printf("                NEW LR: %3x [%4o]", nextLR, nextLR);
+					printf("                NEW LR: %3x [%4o]", ret_vals.LR, ret_vals.LR);
 				}
 			}
 			
@@ -971,9 +974,9 @@ s_updated_vals module_UI (short int IR, short int PC, short int AC, char LR, sho
 					// if most significant bit of AC is 1, then skip
 					if ((ret_vals.AC >> (PDP8_WORD_SIZE - 1)) == 1) {
 						flag_skip_instr = 1;
-						strcat(&str_skip_type," SMA");
+						strcat(str_skip_type," SMA");
 					}
-					strcat(&str_skip_check," SMA");
+					strcat(str_skip_check," SMA");
 				}
 				
 				// SZA - Skip on Zero Accumulator: check bit 6
@@ -981,9 +984,9 @@ s_updated_vals module_UI (short int IR, short int PC, short int AC, char LR, sho
 					// if AC is 0, then skip
 					if (ret_vals.AC == 0) {
 						flag_skip_instr = 1;
-						strcat(&str_skip_type," SZA");
+						strcat(str_skip_type," SZA");
 					}
-					strcat(&str_skip_check," SZA");
+					strcat(str_skip_check," SZA");
 				}
 				
 				// SNL - Skip on Nonzero Link: check bit 7
@@ -991,9 +994,9 @@ s_updated_vals module_UI (short int IR, short int PC, short int AC, char LR, sho
 					// if LR is not 0, then skip
 					if (ret_vals.LR != 0) {
 						flag_skip_instr = 1;
-						strcat(&str_skip_type," SNL");
+						strcat(str_skip_type," SNL");
 					}
-					strcat(&str_skip_check," SNL");
+					strcat(str_skip_check," SNL");
 				}
 			
 				// debug print: indicating if any of the OR skip conditions were met
@@ -1014,7 +1017,7 @@ s_updated_vals module_UI (short int IR, short int PC, short int AC, char LR, sho
 				// flagged as an unconditional branch. 
 				if (((IR >> (PDP8_WORD_SIZE - 7-1)) & 7) == 0) {
 					ret_vals.flag_branch_type = BT_UNCONDITIONAL;
-					str_skip_check = "None. (Unconditional branch)";
+					strncpy(str_skip_check,"None. (Unconditional branch)",DEBUG_STR_N);
 				}
 				else {
 					// Otherwise, it is a conditional branch.
@@ -1033,9 +1036,9 @@ s_updated_vals module_UI (short int IR, short int PC, short int AC, char LR, sho
 					// then AC is negative, and condition is not met
 					if ((ret_vals.AC >> (PDP8_WORD_SIZE - 1)) == 1) {
 						flag_skip_instr = 0;
-						strcat(&str_skip_type," SPA");
+						strcat(str_skip_type," SPA");
 					} 
-					strcat(&str_skip_check," SPA");
+					strcat(str_skip_check," SPA");
 				}
 				
 				// SNA - Skip on Nonzero Accumulator: check bit 6
@@ -1044,9 +1047,9 @@ s_updated_vals module_UI (short int IR, short int PC, short int AC, char LR, sho
 					// do not skip
 					if (ret_vals.AC == 0) {
 						flag_skip_instr = 0;
-						strcat(&str_skip_type," SNA");
+						strcat(str_skip_type," SNA");
 					}
-					strcat(&str_skip_check," SNA");
+					strcat(str_skip_check," SNA");
 				}
 				
 				// SZL - Skip on Zero Link: check bit 7
@@ -1055,9 +1058,9 @@ s_updated_vals module_UI (short int IR, short int PC, short int AC, char LR, sho
 					// so do not skip
 					if (ret_vals.LR != 0) {
 						flag_skip_instr = 0;
-						strcat(&str_skip_type," SZL");
+						strcat(str_skip_type," SZL");
 					}
-					strcat(&str_skip_check," SZL");
+					strcat(str_skip_check," SZL");
 				}
 			
 				// debug print: indicating if any of the OR skip conditions were met
