@@ -38,11 +38,12 @@
 #define PDP8_WORD_SIZE 12		// size of words in memory in bits
 #define PDP8_WORDS_PER_PAGE 128 // number of words per page
 #define PDP8_PAGE_NUM 32		// number of "pages"
-#define PDP8_MEMSIZE PDP8_WORDS_PER_PAGE*PDP8_PAGE_NUM
-#define MEM_ARRAY_MAX PDP8_MEMSIZE-1	// max index number of mem array
+#define PDP8_MEMSIZE (PDP8_WORDS_PER_PAGE*PDP8_PAGE_NUM)
+#define MEM_ARRAY_MAX (PDP8_MEMSIZE-1)	// max index number of mem array
     // total number of words in memory
 #define PDP8_ADDR_SIZE 12	// size of address in bits, hard-coded
-#define WORD_STRING_SIZE PDP8_WORD_SIZE+1
+#define PDP8_LR_SIZE 1		// size of the Link Register
+#define WORD_STRING_SIZE (PDP8_WORD_SIZE+1)
 // Note that addresses are specified with the bits numbered as follows:
 //  <    p  a  g  e    > <     o  f  f  s  e  t     >
 //  |___|___|___|___|___|___|___|___|___|___|___|___|
@@ -51,8 +52,9 @@
 // in the address are:
 #define ADDR_PAGE_LOW 0   // upper index for page within address
 #define ADDR_PAGE_HIGH 4  // lower index for page within address
-#define ADDR_OFFSET_LOW ADDR_PAGE_HIGH + 1 	// upper index for offset within address
-#define ADDR_OFFSET_HIGH PDP8_ADDR_SIZE - 1 // lower index for offset within address
+#define ADDR_OFFSET_LOW (ADDR_PAGE_HIGH + 1) 	// upper index for offset within address
+#define ADDR_OFFSET_HIGH (PDP8_ADDR_SIZE - 1) // lower index for offset within address
+#define ADDR_OFFSET_SIZE (ADDR_OFFSET_HIGH-ADDR_OFFSET_LOW+1)
 
 // Memory Reference Addressing Mode Bit Positions:
 #define ADDR_INDIRECT_ADDR_BIT 3
@@ -74,7 +76,7 @@
 
 // DEBUG PRINT STATEMENTS
 #define DEBUG_STR_LEN 30
-#define DEBUG_STR_N DEBUG_STR_LEN-1
+#define DEBUG_STR_N (DEBUG_STR_LEN-1)
 //---------------------------	
 // END PARAMETER SECTION
 //=========================================================
@@ -155,24 +157,36 @@ typedef struct _branch_stats {
 //---------------------------------------------------------	
 void int_to_binary_str(int x, int max_digits, char* str_binary[])
 {
-	// y is a comparison value, initialized to the integer
-	// number that has a '1' in the most significant bit
-	// position, with all following bits as '0'.
-	//int y = 2^(max_digits-1);
-	int y = 1 << (max_digits-1);
-	int i = 0; // offset into the char[] array
-
 	if (max_digits > 0) {
-		for (; y > 0; y = y >> 1)
-		{
+		// y is a comparison value, initialized to the integer
+		// number that has a '1' in the most significant bit
+		// position, with all following bits as '0'.
+		//int y = 2^(max_digits-1);
+		int y = 1 << (max_digits-1);
+		int i = 0; // offset into the char[] array
+		//int debug = 1;	// debug flag
+		
+		//if (debug) printf("DEBUG: int_to_binary_str()\n");
+		//if (debug) printf("           y: %d\n",y);
+		//if (debug) printf("  max_digits: %d\n",max_digits);
+		//if (debug) printf("  str_binary: %x\n",(unsigned int)str_binary);
+		//if (debug) printf("  Binary digits: ");
+
+		for (; y > 0; y = (y >> 1))
+		{		
 			if ((x & y) == y) {
-				*(char*)(str_binary+i) = '1';
+				*(*(str_binary)+i) = '1';
+				//if (debug) printf("1");
 			}
 			else {
-				*(char*)(str_binary+i) = '0';
+				*(*(str_binary)+i) = '0';
+				//if (debug) printf("0");
 			}
 			i++; // increment the array position
 		}
+		//if (debug) printf("\n");
+		
+		//if (debug) printf("   str_binary: %s\n",*str_binary);
 	}
 }
 
@@ -329,7 +343,7 @@ void read_param_file(s_debug_flags* ptr_debug, char* param_filename)
 	fscanf(fp_paramfile, "%d", &(ptr_debug->eaddr));
 	printf("DEBUG_EADDR is set to: %d\n", ptr_debug->eaddr);
 	fscanf(fp_paramfile, "%d", &(ptr_debug->short_mode));
-	printf("UI_DEBUG is set to: %d\n", ptr_debug->short_mode);
+	printf("DEBUG_SHORT_MODE is set to: %d\n", ptr_debug->short_mode);
 	
 	fclose(fp_paramfile);
 }
@@ -521,36 +535,72 @@ s_effective_addr calc_eaddr(short int reg_IR, short int reg_PC, s_mem_word* ptr_
 	short int memory_page_bit_mask = 1 << (PDP8_WORD_SIZE - ADDR_MEMORY_PAGE_BIT - 1);
 	// the following offset mask will have '1's in all bit positions 
 	// containing the offset
-	short int offset_mask = (1 << (PDP8_WORD_SIZE - ADDR_OFFSET_LOW)) - 1;
+	short int offset_mask = (1 << (ADDR_OFFSET_SIZE)) - 1;
 	// similarly, page_mask has '1's in the bit positions specifying the page
 	// first, set '1' bits for each bit position in the page bits
 	short int page_mask = (1 << (ADDR_PAGE_HIGH - ADDR_PAGE_LOW + 1)) - 1;
+	
+	
+	if (debug) printf(" ADDR_OFFSET_SIZE: %d; PDP8_WORD_SIZE: %d; ADDR_OFFSET_LOW: %d\n",ADDR_OFFSET_SIZE,PDP8_WORD_SIZE,ADDR_OFFSET_LOW);
+	if (debug) printf(" shift_offset = %d\n", PDP8_WORD_SIZE - ADDR_OFFSET_LOW);
+	if (debug) printf(" offset_mask = %x\n",offset_mask);
+	if (debug) printf(" page_mask = %x\n",page_mask);
+	if (debug) printf(" ADDR_OFFSET_HIGH: %d; ADDR_OFFSET_LOW: %d\n",ADDR_OFFSET_HIGH,ADDR_OFFSET_LOW);
+	if (debug) printf(" shift_offset = %d\n",(ADDR_OFFSET_HIGH - ADDR_OFFSET_LOW));
+	
 	// then, shift the page bits into the correct position, 
 	// located to the left of the offset bits
-	page_mask = page_mask << (ADDR_OFFSET_HIGH - ADDR_OFFSET_LOW + 1);
+	page_mask = page_mask << (ADDR_OFFSET_HIGH - ADDR_OFFSET_LOW - 1);
+	
+	if (debug) printf(" page_mask = %x\n",page_mask);
 	
 	// determine the opcode
-	char curr_opcode = reg_IR >> (PDP8_WORD_SIZE - INSTR_OP_LOW + 1);
+	char curr_opcode = reg_IR >> (PDP8_WORD_SIZE - INSTR_OP_LOW - 1);
 	
 	// Check if the opcode of the current instruction is a memory reference 
 	// instruction (opcodes 0 to 5).
 	if ((curr_opcode >= 0) && (curr_opcode <= 5)) {
 		// strings for effective address and current instruction for debug
-		char* p_str_EAddr = malloc(PDP8_ADDR_SIZE*sizeof(char));
+		char* p_str_EAddr = malloc((PDP8_ADDR_SIZE*sizeof(char))+1);
 		if (p_str_EAddr == NULL) {
 			fprintf(stderr,"malloc() for p_str_EAddr failed in calc_eaddr()\n");
 			exit(-1);
-		}
-		char* p_str_IndirectAddr = malloc(PDP8_ADDR_SIZE*sizeof(char));
+		} 
+	//	else {
+	//		if (debug) {
+	//			printf("malloc() succeeded for p_str_EAddr\n");
+	//			printf("  size of p_str_EAddr: %d\n",(int)sizeof(p_str_EAddr));
+	//		}
+	//	}
+		char* p_str_IndirectAddr = malloc((PDP8_ADDR_SIZE*sizeof(char))+1);
 		if (p_str_IndirectAddr == NULL) {
 			fprintf(stderr,"malloc() for p_str_IndirectAddr failed in calc_eaddr()\n");
 			exit(-1);
 		}
-		char* p_str_IR = malloc(PDP8_WORD_SIZE*sizeof(char));
+	//	else {
+	//		if (debug) {
+	//			printf("malloc() succeeded for p_str_IndirectAddr\n");
+	//			printf("  size of p_str_IndirectAddr: %d\n",(int)sizeof(p_str_IndirectAddr));
+	//		}
+	//	}
+		char* p_str_IR = malloc((PDP8_WORD_SIZE*sizeof(char))+1);
 		if (p_str_IR == NULL) {
 			fprintf(stderr,"malloc() for p_str_IR failed in calc_eaddr()\n");
 			exit(-1);
 		}
+	//	else {
+	//		if (debug) {
+	//			printf("malloc() succeeded for p_str_IR\n");
+	//			printf("  size of p_str_IR: %d\n",(int)sizeof(p_str_IR));
+	//		}
+	//	}
+		
+	//	if (debug) {
+			//strncpy(p_str_IR,"111100001111",PDP8_WORD_SIZE);
+			//printf("   temp p_str_IR: %s\n",p_str_IR);
+	//		printf("       &p_str_IR: %x\n",(unsigned int)&p_str_IR);
+	//	}
+		
 		// convert the given IR to a binary string for debug
 		int_to_binary_str(reg_IR, PDP8_WORD_SIZE, &p_str_IR);
 		
@@ -559,20 +609,23 @@ s_effective_addr calc_eaddr(short int reg_IR, short int reg_PC, s_mem_word* ptr_
 		// determine offset from the IR
 		CurrentOffset = reg_IR & offset_mask;
 		
+		if (debug) printf("Current PC: %x, Current IR: %x\n", reg_PC, reg_IR);
+		if (debug) printf("Current Page: %x; Current Offset: %x\n",CurrentPage,CurrentOffset);
+		
 		// Debug Initial Prints:
 		if (debug) {
-			printf("BEGIN EFFECTIVE ADDRESS CALC:");
-			printf("         CURRENT INSTR: %s [%o]", p_str_IR, reg_IR);
+			printf("BEGIN EFFECTIVE ADDRESS CALC:\n");
+			printf("         CURRENT INSTR: %s [%o]\n", p_str_IR, reg_IR);
 			printf(" ");
-			printf("   0   1   2   3   4   5   6   7   8   9  10  11");
-			printf(" +---+---+---+---+---+---+---+---+---+---+---+---+");
-			printf(" | %c | %c | %c | %c | %c | %c | %c | %c | %c | %c | %c | %c |",
+			printf("   0   1   2   3   4   5   6   7   8   9  10  11\n");
+			printf(" +---+---+---+---+---+---+---+---+---+---+---+---+\n");
+			printf(" | %c | %c | %c | %c | %c | %c | %c | %c | %c | %c | %c | %c |\n",
 				*p_str_IR,*(p_str_IR+1),*(p_str_IR+2),*(p_str_IR+3),
 				*(p_str_IR+4),*(p_str_IR+5),*(p_str_IR+6),*(p_str_IR+7),
 				*(p_str_IR+8),*(p_str_IR+9),*(p_str_IR+10),*(p_str_IR+11));
-			printf(" +---+---+---+---+---+---+---+---+---+---+---+---+");
-			printf(" |  op-code  | I | M |      O  F  F  S  E  T     |");
-			printf(" +---+---+---+---+---+---+---+---+---+---+---+---+");
+			printf(" +---+---+---+---+---+---+---+---+---+---+---+---+\n");
+			printf(" |  op-code  | I | M |      O  F  F  S  E  T     |\n");
+			printf(" +---+---+---+---+---+---+---+---+---+---+---+---+\n");
 			printf(" ");
 		}
 		
@@ -592,8 +645,8 @@ s_effective_addr calc_eaddr(short int reg_IR, short int reg_PC, s_mem_word* ptr_
 				int_to_binary_str(EffectiveAddress, PDP8_ADDR_SIZE, &p_str_EAddr);
 				
 				if (debug) {
-					printf("  -- ZERO PAGE ADDRESSING --");
-					printf("     EFFECTIVE ADDRESS: %s [%o]", p_str_EAddr, EffectiveAddress);
+					printf("  -- ZERO PAGE ADDRESSING --\n");
+					printf("     EFFECTIVE ADDRESS: %s [%o]\n", p_str_EAddr, EffectiveAddress);
 				}
 				//--------------------------------------------
 			}
@@ -608,8 +661,8 @@ s_effective_addr calc_eaddr(short int reg_IR, short int reg_PC, s_mem_word* ptr_
 				int_to_binary_str(EffectiveAddress, PDP8_ADDR_SIZE, &p_str_EAddr);
 				
 				if (debug) {
-					printf("  -- CURRENT PAGE ADDRESSING --");
-					printf("     EFFECTIVE ADDRESS: %s [%o]", p_str_EAddr, EffectiveAddress);
+					printf("  -- CURRENT PAGE ADDRESSING --\n");
+					printf("     EFFECTIVE ADDRESS: %s [%o]\n", p_str_EAddr, EffectiveAddress);
 				}
 				//--------------------------------------------
 			}
@@ -634,9 +687,9 @@ s_effective_addr calc_eaddr(short int reg_IR, short int reg_PC, s_mem_word* ptr_
 					int_to_binary_str(IndirectAddrLoc, PDP8_ADDR_SIZE, &p_str_IndirectAddr);
 					
 					if (debug) {
-						printf("  -- INDIRECT ADDRESSING; ZERO PAGE --");
-						printf("INDIRECT ADDR LOCATION: %s [%o]", p_str_IndirectAddr, IndirectAddrLoc);
-						printf("     EFFECTIVE ADDRESS: %s [%o]", p_str_EAddr, EffectiveAddress);
+						printf("  -- INDIRECT ADDRESSING; ZERO PAGE --\n");
+						printf("INDIRECT ADDR LOCATION: %s [%o]\n", p_str_IndirectAddr, IndirectAddrLoc);
+						printf("     EFFECTIVE ADDRESS: %s [%o]\n", p_str_EAddr, EffectiveAddress);
 					}
 				}
 				else
@@ -652,9 +705,9 @@ s_effective_addr calc_eaddr(short int reg_IR, short int reg_PC, s_mem_word* ptr_
 					int_to_binary_str(IndirectAddrLoc, PDP8_ADDR_SIZE, &p_str_IndirectAddr);
 					
 					if (debug) {
-						printf("  -- INDIRECT ADDRESSING; CURRENT PAGE --");
-						printf("INDIRECT ADDR LOCATION: %s [%o]", p_str_IndirectAddr, IndirectAddrLoc);
-						printf("     EFFECTIVE ADDRESS: %s [%o]", p_str_EAddr, EffectiveAddress);
+						printf("  -- INDIRECT ADDRESSING; CURRENT PAGE --\n");
+						printf("INDIRECT ADDR LOCATION: %s [%o]\n", p_str_IndirectAddr, IndirectAddrLoc);
+						printf("     EFFECTIVE ADDRESS: %s [%o]\n", p_str_EAddr, EffectiveAddress);
 					}
 				}
 			  
@@ -679,9 +732,9 @@ s_effective_addr calc_eaddr(short int reg_IR, short int reg_PC, s_mem_word* ptr_
 
 				if (debug)
 				{
-					printf("  -- AUTO-INDEX ADDRESSING --");
-					printf("INDIRECT ADDR LOCATION: %s [%o]", p_str_IndirectAddr, IndirectAddrLoc);
-					printf("  Orig M[IndirectAddr]: %s [%o]", p_str_EAddr, EffectiveAddress);
+					printf("  -- AUTO-INDEX ADDRESSING --\n");
+					printf("INDIRECT ADDR LOCATION: %s [%o]\n", p_str_IndirectAddr, IndirectAddrLoc);
+					printf("  Orig M[IndirectAddr]: %s [%o]\n", p_str_EAddr, EffectiveAddress);
 				}
 				
 				// Calculate the actual incremented value to be used as the effective address
@@ -696,18 +749,21 @@ s_effective_addr calc_eaddr(short int reg_IR, short int reg_PC, s_mem_word* ptr_
 				ret_EAddr.flag_MemType_AutoIndex = TRUE;
 				
 				if (debug) {
-					printf("     EFFECTIVE ADDRESS: %s [%o]", p_str_EAddr, EffectiveAddress);
+					printf("     EFFECTIVE ADDRESS: %s [%o]\n", p_str_EAddr, EffectiveAddress);
 				}
 			}
 		} // end else where indirect addressing bit = 1
 		
 		if (debug) {
-			printf("----------------------------------------------------");
+			printf("----------------------------------------------------\n");
 		}
 	
 		free(p_str_EAddr); // free the strings that were used for debug
+	//	printf("free() succeeded for p_str_EAddr\n");
 		free(p_str_IndirectAddr);
+	//	printf("free() succeeded for p_str_IndirectAddr\n");
 		free(p_str_IR);	
+	//	printf("free() succeeded for p_str_IR\n");
 		
 		ret_EAddr.EAddr = EffectiveAddress; // save calculated EAddr to return value struct
 	}
@@ -751,7 +807,12 @@ s_updated_vals module_UI (short int IR, short int PC, short int AC, char LR, sho
 	// number of bits
 	short int word_mask = (1 << PDP8_WORD_SIZE) - 1;
 	
-	char str_IR [WORD_STRING_SIZE];	// string for displaying binary value of IR
+	// string for displaying binary value of IR
+	char* str_IR = malloc((WORD_STRING_SIZE*sizeof(char))+1);
+	if (str_IR == NULL) {
+		fprintf(stderr,"malloc() for str_IR failed in main()\n");
+		exit(-1);
+	}	
 	int_to_binary_str(IR, PDP8_WORD_SIZE, (char**)&str_IR);
 	
 	if (debug) {
@@ -764,7 +825,7 @@ s_updated_vals module_UI (short int IR, short int PC, short int AC, char LR, sho
 		printf(" | %c | %c | %c | %c | %c | %c | %c | %c | %c | %c | %c | %c |\n",
 			str_IR[0],str_IR[1],str_IR[2],str_IR[3],str_IR[4],str_IR[5],
 			str_IR[6],str_IR[7],str_IR[8],str_IR[9],str_IR[10],str_IR[11]);
-		printf(" +---+---+---+---+---+---+---+---+---+---+---+---+");
+		printf(" +---+---+---+---+---+---+---+---+---+---+---+---+\n");
 	}
 	
 	// Group 1 Microinstructions: Check if bit 3 is a 0
@@ -777,7 +838,7 @@ s_updated_vals module_UI (short int IR, short int PC, short int AC, char LR, sho
 		}
 		
 		// if bits IR[4:11] == 0, then the instruction is a NOP
-		if ( (IR << 4) == 0) {
+		if ( ((IR << 4) & word_mask) == 0) {
 			ret_vals.flag_NOP = TRUE;
 		}
 		else {
@@ -896,8 +957,8 @@ s_updated_vals module_UI (short int IR, short int PC, short int AC, char LR, sho
 			} // end rotate right
 				
 			// Rotate left:
-			// Check if bit 9 is 0: RAL
-			if (((IR >> (PDP8_WORD_SIZE - 9-1)) & 1) == 0) {
+			// Check if bit 9 is 1: RAL
+			if (((IR >> (PDP8_WORD_SIZE - 9-1)) & 1) == 1) {
 				// Check if bit 10 is 0: If so, only need to rotate one bit position
 				if (((IR >> (PDP8_WORD_SIZE - 10-1)) & 1) == 0) {
 					// First set the least significant bit of tmp_rotate to be
@@ -1123,6 +1184,9 @@ s_updated_vals module_UI (short int IR, short int PC, short int AC, char LR, sho
 			// which will just go to the next instruction as it should.)
 		} // End Group 3 Microinstructions
 	} // End Group 2 and 3 Microinstructions section
-		
+
+	// free str_IR
+	free(str_IR);
+	
 	return ret_vals; // return updated values
 }

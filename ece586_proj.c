@@ -66,21 +66,7 @@ s_mem_word mem_array [PDP8_MEMSIZE]; // Memory Space
 s_debug_flags debug;				// Debug Flags
 s_branch_stats branch_statistics; 	// Branch Statistics tracking
 
-// - Debug Print Strings:
-char curr_opcode_str [DEBUG_STR_LEN];
-char bin_str_PC [PDP8_ADDR_SIZE];
-char bin_str_next_PC [PDP8_ADDR_SIZE];
-char bin_str_IR [PDP8_WORD_SIZE];
-char bin_str_AC [PDP8_WORD_SIZE];
-char bin_str_next_AC [PDP8_WORD_SIZE];
-char bin_str_LR [1];
-char bin_str_next_LR [1];
-char bin_str_SR [PDP8_WORD_SIZE];
-char bin_str_next_SR [PDP8_WORD_SIZE];
-char bin_str_EAddr [PDP8_ADDR_SIZE];
-char bin_str_next_EAddr [PDP8_ADDR_SIZE];
-char bin_str_memval_EAddr [PDP8_WORD_SIZE];
-char bin_str_next_memval_EAddr [PDP8_WORD_SIZE];
+
 	
 int main (int argc, char* argv[])
 {
@@ -143,6 +129,73 @@ int main (int argc, char* argv[])
 	int stat_io = 0;
 	int stat_ui = 0;
 
+	// - Debug Print Strings:
+	// Initialize and allocate space for debug print strings
+	char* curr_opcode_str = malloc((DEBUG_STR_LEN*sizeof(char))+1);
+	if (curr_opcode_str == NULL) {
+		fprintf(stderr,"malloc() for curr_opcode_str failed in main()\n");
+		exit(-1);
+	}
+	char* bin_str_PC = malloc((PDP8_ADDR_SIZE*sizeof(char))+1);
+	if (bin_str_PC == NULL) {
+		fprintf(stderr,"malloc() for bin_str_PC failed in main()\n");
+		exit(-1);
+	}
+	char* bin_str_next_PC = malloc((PDP8_ADDR_SIZE*sizeof(char))+1);
+	if (bin_str_next_PC == NULL) {
+		fprintf(stderr,"malloc() for bin_str_next_PC failed in main()\n");
+		exit(-1);
+	}
+	char* bin_str_IR = malloc((PDP8_WORD_SIZE*sizeof(char))+1);
+	if (bin_str_IR == NULL) {
+		fprintf(stderr,"malloc() for bin_str_IR failed in main()\n");
+		exit(-1);
+	}
+	char* bin_str_AC = malloc((PDP8_WORD_SIZE*sizeof(char))+1);
+	if (bin_str_AC == NULL) {
+		fprintf(stderr,"malloc() for bin_str_AC failed in main()\n");
+		exit(-1);
+	}
+	char* bin_str_next_AC = malloc((PDP8_WORD_SIZE*sizeof(char))+1);
+	if (bin_str_next_AC == NULL) {
+		fprintf(stderr,"malloc() for bin_str_next_AC failed in main()\n");
+		exit(-1);
+	}
+	char* bin_str_LR = malloc((PDP8_LR_SIZE*sizeof(char))+1);
+	if (bin_str_LR == NULL) {
+		fprintf(stderr,"malloc() for bin_str_LR failed in main()\n");
+		exit(-1);
+	}
+	char* bin_str_next_LR = malloc((PDP8_LR_SIZE*sizeof(char))+1);
+	if (bin_str_next_LR == NULL) {
+		fprintf(stderr,"malloc() for bin_str_next_LR failed in main()\n");
+		exit(-1);
+	}
+	char* bin_str_SR = malloc((PDP8_WORD_SIZE*sizeof(char))+1);
+	if (bin_str_SR == NULL) {
+		fprintf(stderr,"malloc() for bin_str_SR failed in main()\n");
+		exit(-1);
+	}
+	char* bin_str_EAddr = malloc((PDP8_ADDR_SIZE*sizeof(char))+1);
+	if (bin_str_EAddr == NULL) {
+		fprintf(stderr,"malloc() for bin_str_EAddr failed in main()\n");
+		exit(-1);
+	}
+	char* bin_str_next_EAddr = malloc((PDP8_ADDR_SIZE*sizeof(char))+1);
+	if (bin_str_next_EAddr == NULL) {
+		fprintf(stderr,"malloc() for bin_str_next_EAddr failed in main()\n");
+		exit(-1);
+	}
+	char* bin_str_memval_EAddr = malloc((PDP8_WORD_SIZE*sizeof(char))+1);
+	if (bin_str_memval_EAddr == NULL) {
+		fprintf(stderr,"malloc() for bin_str_memval_EAddr failed in main()\n");
+		exit(-1);
+	}
+	char* bin_str_next_memval_EAddr = malloc((PDP8_WORD_SIZE*sizeof(char))+1);
+	if (bin_str_next_memval_EAddr == NULL) {
+		fprintf(stderr,"malloc() for bin_str_next_memval_EAddr failed in main()\n");
+		exit(-1);
+	}
 	
 	// CHECK COMMAND LINE ARGUMENTS:
 	if (argc < 2) {
@@ -187,28 +240,23 @@ int main (int argc, char* argv[])
 	fprintf(fp_branchtrace,"PC [octal]    BRANCH TYPE   TAKEN/NOT TAKEN    TARGET ADDRESS [octal]\n");
 	fprintf(fp_branchtrace,"---------------------------------------------------------------------\n");
 	
+	int counter = 0;
+	
 	//======================================================
 	// MAIN LOOP
-	while (!flag_HLT) {
+	while (!flag_HLT && (counter < 10)) {
+		counter++;
+		effective_address = 0;
+		memval_eaddr = 0;
+		
 		// STEP 1: FETCH INSTRUCTION
 		reg_IR = read_mem(reg_PC, TF_FETCH, &mem_array[0], fp_tracefile);
 		// set opcode
-		curr_opcode = reg_IR >> (PDP8_WORD_SIZE - INSTR_OP_LOW + 1);
+		curr_opcode = reg_IR >> (PDP8_WORD_SIZE - INSTR_OP_LOW - 1);
 		
 		// update stat for instruction count
 		stat_instructions = stat_instructions + 1;
 		
-		if(debug.instr) {
-			printf("================== INSTRUCTION #%-1d : %s ==================\n",stat_instructions, curr_opcode_str);
-		}
-		
-		// STEP 2: CALCULATE EFFECTIVE ADDRESS IF NEEDED
-		curr_eaddr = calc_eaddr(reg_IR, reg_PC, &mem_array[0], fp_tracefile, debug.eaddr);
-		effective_address = curr_eaddr.EAddr;
-											
-		//--------------------------------
-		// DEBUG PRINTS OF INITIAL VALUES
-		//--------------------------------
 		// Set opcode string.
 		switch (curr_opcode) {
 			case OP_AND:	strncpy(curr_opcode_str,"AND",DEBUG_STR_N);
@@ -231,12 +279,25 @@ int main (int argc, char* argv[])
 							break;
 		}
 		
+		if(debug.instr) {
+			printf("================== INSTRUCTION #%-1d : %s ==================\n",stat_instructions, curr_opcode_str);
+		}
+		
+		// STEP 2: CALCULATE EFFECTIVE ADDRESS IF NEEDED
+		curr_eaddr = calc_eaddr(reg_IR, reg_PC, &mem_array[0], fp_tracefile, debug.eaddr);
+		effective_address = curr_eaddr.EAddr;
+											
+		//--------------------------------
+		// DEBUG PRINTS OF INITIAL VALUES
+		//--------------------------------
+		
 		if (debug.instr || debug.short_mode) {
 			// Get binary values of initial values
+			//printf("   &bin_str_PC: %x\n",(unsigned int)&bin_str_PC);
 			int_to_binary_str(reg_PC, PDP8_ADDR_SIZE, (char**)&bin_str_PC);
 			int_to_binary_str(reg_IR, PDP8_WORD_SIZE, (char**)&bin_str_IR);
 			int_to_binary_str(effective_address, PDP8_ADDR_SIZE, (char**)&bin_str_EAddr);
-			int_to_binary_str(memval_eaddr, PDP8_WORD_SIZE, (char**)&bin_str_memval_EAddr);
+			//int_to_binary_str(memval_eaddr, PDP8_WORD_SIZE, (char**)&bin_str_memval_EAddr);
 			int_to_binary_str(reg_AC, PDP8_WORD_SIZE, (char**)&bin_str_AC);
 			int_to_binary_str(reg_LR, 1, (char**)&bin_str_LR);
 			int_to_binary_str(reg_SR, PDP8_WORD_SIZE, (char**)&bin_str_SR);
@@ -246,14 +307,15 @@ int main (int argc, char* argv[])
 			//printf("================== INSTRUCTION #%-1d : %s ==================\n",stat_instructions, curr_opcode_str);
 			printf("  VALUES BEFORE UPDATE:\n");
 			printf("                  PC / IR: %s [%4o] / %s [%4o]\n", bin_str_PC, reg_PC, bin_str_IR, reg_IR);
-			printf("EFFECTIVE ADDRESS / VALUE: %s [%4o] / %s [%4o]\n", bin_str_EAddr, effective_address, bin_str_memval_EAddr, memval_eaddr);
+			printf("EFFECTIVE ADDRESS / VALUE: %s [%o] \n", bin_str_EAddr, effective_address);
+			//printf("EFFECTIVE ADDRESS / VALUE: %s [%4o] / %s [%4o]\n", bin_str_EAddr, effective_address, bin_str_memval_EAddr, memval_eaddr);
 			printf("       LINK REGISTER [LR]: %1o   ACCUMULATOR [AC]: %s [%4o]\n", reg_LR, bin_str_AC, reg_AC);
 			printf("     SWITCH REGISTER [SR]: %s [%4o]\n", bin_str_SR, reg_SR);
 			//printf("                    IR: %s [%3x]\n", bin_str_IR,reg_IR);
 			//printf("                OPCODE: %12.3s [%3x]\n", curr_opcode_str, curr_opcode);
 			//printf("     VALUE @ EFF. ADDR: %s [%3x]\n", bin_str_memval_EAddr, memval_eaddr);
 			//printf("    LINK REGISTER [LR]: %12s [%3x]\n", bin_str_LR, reg_LR);
-			printf("----------------------------------------------------");
+			printf("----------------------------------------------------\n");
 		}
 		else if(debug.short_mode)	//Shortened version. Only want if the long version is off.  Shows changes caused at current PC by current OP.
 		{
@@ -296,7 +358,6 @@ int main (int argc, char* argv[])
 							// Debug Print
 							if (debug.module) printf("               NEXT AC: [%o]", next_AC);
 							// Update Registers
-							reg_PC = next_PC;
 							reg_AC = next_AC;
 							break;
 			case OP_TAD:  	// first, load the value from memory at the effective address
@@ -312,7 +373,6 @@ int main (int argc, char* argv[])
 							// Debug Print
 							if (debug.module) printf("            NEXT LR/AC: [%o][%o]", next_LR, next_AC);
 							// Update Registers
-							reg_PC = next_PC;
 							reg_AC = next_AC;
 							reg_LR = next_LR;
 							break;
@@ -333,7 +393,6 @@ int main (int argc, char* argv[])
 							// update branch statistics, and write to branch trace file
 							write_branch_trace(fp_branchtrace, reg_PC, curr_opcode, next_PC, flag_branch_taken, BT_CONDITIONAL, &branch_statistics);
 							// Update Registers
-							reg_PC = next_PC;
 							break;
 			case OP_DCA:  	// write AC to memory
 							write_mem(effective_address, reg_AC, &mem_array[0], fp_tracefile);
@@ -353,7 +412,6 @@ int main (int argc, char* argv[])
 							// update branch statistics, and write to branch trace file
 							write_branch_trace(fp_branchtrace, reg_PC, curr_opcode, next_PC, BT_TAKEN, BT_UNCONDITIONAL, &branch_statistics);
 							// Update Registers
-							reg_PC = next_PC;
 							break;
 			case OP_JMP:  	next_PC = effective_address;
 							// Debug Print
@@ -361,12 +419,10 @@ int main (int argc, char* argv[])
 							// update branch statistics, and write to branch trace file
 							write_branch_trace(fp_branchtrace, reg_PC, curr_opcode, next_PC, BT_TAKEN, BT_UNCONDITIONAL, &branch_statistics);
 							// Update Registers
-							reg_PC = next_PC;
 							break;
 			case OP_IO:   	// Not implemented.
 							fprintf(stderr,"WARNING: IO instruction encountered at PC: [%o]\n",reg_PC);
 							// Update Registers
-							reg_PC = next_PC;
 							break;
 			case OP_UI:   	// Obtain next values from the UI subroutine
 							// Note that next_PC is passed as an argument here since PC has been pre-incremented.
@@ -374,13 +430,12 @@ int main (int argc, char* argv[])
 							
 							// Debug Print
 							if (debug.module) {
-								printf("               NEXT PC: [%o]", next_vals.PC);
-								printf("            NEXT LR/AC: %x/%x[%o/%o]",next_vals.LR,next_vals.AC,next_vals.LR,next_vals.AC);
+								printf("               NEXT PC: [%o]\n", next_vals.PC);
+								printf("            NEXT LR/AC: %x/%x[%o/%o]\n",next_vals.LR,next_vals.AC,next_vals.LR,next_vals.AC);
 							}
 							// update branch statistics, and write to branch trace file
 							write_branch_trace(fp_branchtrace, reg_PC, curr_opcode, next_vals.PC, next_vals.flag_branch_taken, next_vals.flag_branch_type, &branch_statistics);
 							// Update Registers
-							reg_PC = next_vals.PC;
 							reg_AC = next_vals.AC;
 							reg_LR = next_vals.LR;
 							flag_HLT = next_vals.flag_HLT;
@@ -397,7 +452,10 @@ int main (int argc, char* argv[])
 			printf("-----------------------------------------------------\n");
 		}
 		
-		// STEP 5: UPDATE STATS
+		// STEP 5: UPDATE THE PROGRAM COUNTER (PC)
+		reg_PC = next_PC;
+		
+		// STEP 6: UPDATE STATS
 		switch (curr_opcode) {
 			case OP_AND:	stat_and = stat_and + 1;
 							stat_clocks = stat_clocks + 2;	
