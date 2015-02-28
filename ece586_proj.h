@@ -226,7 +226,7 @@ void load_memory_array(s_mem_word* ptr_mem_array, char* input_filename, char DEB
 	while (c != EOF) {
 		// Check first character for '@', indicating memory address
 		if (c == '@') {
-			//if (DEBUG) printf("r = %s", r);
+			//if (DEBUG_MEM_DISPLAY) printf("r = %s", r);
 			
 			curr_addr = 0;
 			c = fgetc(fp_inputfile);  // get first digit of address
@@ -237,20 +237,20 @@ void load_memory_array(s_mem_word* ptr_mem_array, char* input_filename, char DEB
 				
 				// check if current digit is between 0 and 9
 				if ((c >= '0') && (c <= '9')) {
-					//if (DEBUG) printf("c = %s [%x]", c, c - "0");
+					//if (DEBUG_MEM_DISPLAY) printf("c = %s [%x]", c, c - "0");
 					curr_addr = curr_addr + (c - '0');	// add value
 				}
 				else // otherwise the digit is between A and F
 				{
 					// subtract ASCII for "a" before adding the offset of 10
-					//if (DEBUG) printf("c = %s [%x]", c, (c - "a" + 10));
+					//if (DEBUG_MEM_DISPLAY) printf("c = %s [%x]", c, (c - "a" + 10));
 					curr_addr = curr_addr + c - 'a' + 10;
 				}
 				
 				c = fgetc(fp_inputfile); // get next character
 			}
 			
-			//if (DEBUG) printf("curr_addr = %x [%o]", curr_addr, curr_addr);
+	//		if (DEBUG_MEM_DISPLAY) printf("curr_addr = %x [%o]\n", curr_addr, curr_addr);
 		}
 		else {
 			// otherwise, this line has a data value, and first
@@ -265,13 +265,13 @@ void load_memory_array(s_mem_word* ptr_mem_array, char* input_filename, char DEB
 
 				// check if current digit is between 0 and 9
 				if ((c >= '0') && (c <= '9')) {
-					//if (DEBUG) printf("c = %s [%x]", c, c - "0");
+					//if (DEBUG_MEM_DISPLAY) printf("c = %s [%x]", c, c - "0");
 					curr_data = curr_data + (c - '0');	// add value
 				}
 				else	// otherwise the digit is between A and F
 				{
 					// subtract ASCII for "a" before adding the offset of 10
-					//if (DEBUG) printf("c = %s [%x]", c, (c - "a" + 10));
+					//if (DEBUG_MEM_DISPLAY) printf("c = %s [%x]", c, (c - "a" + 10));
 					curr_data = curr_data + c - 'a' + 10;
 				}
 				
@@ -282,13 +282,16 @@ void load_memory_array(s_mem_word* ptr_mem_array, char* input_filename, char DEB
 			(ptr_mem_array+curr_addr)->value = curr_data;
 			(ptr_mem_array+curr_addr)->valid = 1;
 
-//				if(DEBUG_MEM_DISPLAY) printf("Address: %3x [%4o] Value: %x [%o]", curr_addr, curr_addr, curr_data,curr_data);
+	//		if(DEBUG_MEM_DISPLAY) printf("Address: %3x [%4o] Value: %x [%o]", curr_addr, curr_addr, curr_data,curr_data);
+	//		if (DEBUG_MEM_DISPLAY) printf("curr_addr: %x [%o]; curr_data: %x [%o]\n", curr_addr, curr_addr, curr_data, curr_data);
 
 			// increment the current address
 			curr_addr = curr_addr + 1;
 		}
 		
-		c = fgetc(fp_inputfile); // get next character
+		while (((c == '\n') || (c == '\r') || (c == ' ')) && (c != EOF)) {
+			c = fgetc(fp_inputfile); // get next character
+		}
 		// NOTE: This should be the first character on the next line,
 		//       since the previous character read should either have been
 		//       a newline, carriage return, or EOF.
@@ -540,19 +543,20 @@ s_effective_addr calc_eaddr(short int reg_IR, short int reg_PC, s_mem_word* ptr_
 	// first, set '1' bits for each bit position in the page bits
 	short int page_mask = (1 << (ADDR_PAGE_HIGH - ADDR_PAGE_LOW + 1)) - 1;
 	
-	
+	/*
 	if (debug) printf(" ADDR_OFFSET_SIZE: %d; PDP8_WORD_SIZE: %d; ADDR_OFFSET_LOW: %d\n",ADDR_OFFSET_SIZE,PDP8_WORD_SIZE,ADDR_OFFSET_LOW);
 	if (debug) printf(" shift_offset = %d\n", PDP8_WORD_SIZE - ADDR_OFFSET_LOW);
 	if (debug) printf(" offset_mask = %x\n",offset_mask);
 	if (debug) printf(" page_mask = %x\n",page_mask);
 	if (debug) printf(" ADDR_OFFSET_HIGH: %d; ADDR_OFFSET_LOW: %d\n",ADDR_OFFSET_HIGH,ADDR_OFFSET_LOW);
 	if (debug) printf(" shift_offset = %d\n",(ADDR_OFFSET_HIGH - ADDR_OFFSET_LOW));
+	*/
 	
 	// then, shift the page bits into the correct position, 
 	// located to the left of the offset bits
-	page_mask = page_mask << (ADDR_OFFSET_HIGH - ADDR_OFFSET_LOW - 1);
+	page_mask = page_mask << (ADDR_OFFSET_SIZE);
 	
-	if (debug) printf(" page_mask = %x\n",page_mask);
+	//if (debug) printf(" page_mask = %x\n",page_mask);
 	
 	// determine the opcode
 	char curr_opcode = reg_IR >> (PDP8_WORD_SIZE - INSTR_OP_LOW - 1);
@@ -609,8 +613,10 @@ s_effective_addr calc_eaddr(short int reg_IR, short int reg_PC, s_mem_word* ptr_
 		// determine offset from the IR
 		CurrentOffset = reg_IR & offset_mask;
 		
-		if (debug) printf("Current PC: %x, Current IR: %x\n", reg_PC, reg_IR);
-		if (debug) printf("Current Page: %x; Current Offset: %x\n",CurrentPage,CurrentOffset);
+		
+	//	if (debug) printf("Current PC: %x, Current IR: %x\n", reg_PC, reg_IR);
+	//	if (debug) printf("Current Page: %x; Current Offset: %x\n",CurrentPage,CurrentOffset);
+		
 		
 		// Debug Initial Prints:
 		if (debug) {
@@ -765,6 +771,7 @@ s_effective_addr calc_eaddr(short int reg_IR, short int reg_PC, s_mem_word* ptr_
 		free(p_str_IR);	
 	//	printf("free() succeeded for p_str_IR\n");
 		
+		if (debug) printf("Calculated Effective Address: %x [%o]\n",EffectiveAddress,EffectiveAddress);
 		ret_EAddr.EAddr = EffectiveAddress; // save calculated EAddr to return value struct
 	}
 		
@@ -1013,16 +1020,16 @@ s_updated_vals module_UI (short int IR, short int PC, short int AC, char LR, sho
 	{
 		// Check if bit 11 is 0: Group 2 Microinstructions
 		if (((IR >> (PDP8_WORD_SIZE - 11-1)) & 1) == 0) {
-			// debug print
-			if (debug) {
-				printf("                  cla sma sza snl 0/1 osr hlt\n");
-				printf(" \n");
-				printf(" Group 2 Microinstructions:\n");
-			}
-			
 			// Check if bit 8 is set to 0: 
 			// OR subgroup
 			if (((IR >> (PDP8_WORD_SIZE - 8-1)) & 1) == 0) {
+				// debug print
+				if (debug) {
+					printf("                  cla sma sza snl 0/1 osr hlt\n");
+					printf(" \n");
+					printf(" Group 2 Microinstructions:\n");
+				}
+				
 				// check if any of bits 5 through 7 were set, indicating
 				// that an OR skip condition was to be checked (this instruction
 				// should be flagged as a conditional branch instruction)
@@ -1031,7 +1038,7 @@ s_updated_vals module_UI (short int IR, short int PC, short int AC, char LR, sho
 				}
 				
 				// SMA - Skip on Minus Accumulator: check bit 5
-				if (((IR >> (PDP8_WORD_SIZE - 5-1)) & 1) == 0) {
+				if (((IR >> (PDP8_WORD_SIZE - 5-1)) & 1) == 1) {
 					// if most significant bit of AC is 1, then skip
 					if ((ret_vals.AC >> (PDP8_WORD_SIZE - 1)) == 1) {
 						flag_skip_instr = 1;
@@ -1041,7 +1048,7 @@ s_updated_vals module_UI (short int IR, short int PC, short int AC, char LR, sho
 				}
 				
 				// SZA - Skip on Zero Accumulator: check bit 6
-				if (((IR >> (PDP8_WORD_SIZE - 6-1)) & 1) == 0) {
+				if (((IR >> (PDP8_WORD_SIZE - 6-1)) & 1) == 1) {
 					// if AC is 0, then skip
 					if (ret_vals.AC == 0) {
 						flag_skip_instr = 1;
@@ -1051,7 +1058,7 @@ s_updated_vals module_UI (short int IR, short int PC, short int AC, char LR, sho
 				}
 				
 				// SNL - Skip on Nonzero Link: check bit 7
-				if (((IR >> (PDP8_WORD_SIZE - 7-1)) & 1) == 0) {
+				if (((IR >> (PDP8_WORD_SIZE - 7-1)) & 1) == 1) {
 					// if LR is not 0, then skip
 					if (ret_vals.LR != 0) {
 						flag_skip_instr = 1;
@@ -1074,6 +1081,13 @@ s_updated_vals module_UI (short int IR, short int PC, short int AC, char LR, sho
 			} // end OR subgroup
 			else // otherwise bit 8 = 1: indicating AND subgroup
 			{
+				// debug print
+				if (debug) {
+					printf("                  cla spa sna szl 0/1 osr hlt\n");
+					printf(" \n");
+					printf(" Group 2 Microinstructions:\n");
+				}
+				
 				// check if bits [5:7] were all zero: Skip Always should be 
 				// flagged as an unconditional branch. 
 				if (((IR >> (PDP8_WORD_SIZE - 7-1)) & 7) == 0) {
@@ -1092,7 +1106,7 @@ s_updated_vals module_UI (short int IR, short int PC, short int AC, char LR, sho
 				// to indicate the conditions that failed.
 				
 				// SPA - Skip on Positive Accumulator: check bit 5
-				if (((IR >> (PDP8_WORD_SIZE - 5-1)) & 1) == 0) {
+				if (((IR >> (PDP8_WORD_SIZE - 5-1)) & 1) == 1) {
 					// if most significant bit of AC is not 0, then 
 					// then AC is negative, and condition is not met
 					if ((ret_vals.AC >> (PDP8_WORD_SIZE - 1)) == 1) {
@@ -1103,7 +1117,7 @@ s_updated_vals module_UI (short int IR, short int PC, short int AC, char LR, sho
 				}
 				
 				// SNA - Skip on Nonzero Accumulator: check bit 6
-				if (((IR >> (PDP8_WORD_SIZE - 6-1)) & 1) == 0) {
+				if (((IR >> (PDP8_WORD_SIZE - 6-1)) & 1) == 1) {
 					// if AC is 0, then condition was not met, so
 					// do not skip
 					if (ret_vals.AC == 0) {
@@ -1114,7 +1128,7 @@ s_updated_vals module_UI (short int IR, short int PC, short int AC, char LR, sho
 				}
 				
 				// SZL - Skip on Zero Link: check bit 7
-				if (((IR >> (PDP8_WORD_SIZE - 7-1)) & 1) == 0) {
+				if (((IR >> (PDP8_WORD_SIZE - 7-1)) & 1) == 1) {
 					// if LR is non-zero, then condition not satisfied,
 					// so do not skip
 					if (ret_vals.LR != 0) {
@@ -1138,9 +1152,11 @@ s_updated_vals module_UI (short int IR, short int PC, short int AC, char LR, sho
 			} // end AND subgroup
 			
 			// if the flag_skip_instr variable was set, 
-			// then increment PC by 1
+			// then increment PC by 1, and flag the branch
+			// as taken.
 			if (flag_skip_instr) {
 				ret_vals.PC++;
+				ret_vals.flag_branch_taken = BT_TAKEN;
 			}
 			
 			// CLA - Clear Accumulator: check if bit 4 is set
@@ -1148,7 +1164,7 @@ s_updated_vals module_UI (short int IR, short int PC, short int AC, char LR, sho
 				ret_vals.AC = 0;
 				if (debug) {
 					printf(" -- CLA - Clear Accumulator\n");
-					printf("                NEW AC: %x [%o]", ret_vals.AC, ret_vals.AC);
+					printf("                NEW AC: %x [%o]\n", ret_vals.AC, ret_vals.AC);
 				}
 			}
 			

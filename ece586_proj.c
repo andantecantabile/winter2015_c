@@ -76,6 +76,7 @@ int main (int argc, char* argv[])
 	short int memval_eaddr;			// Value of the word located in memory at the effective address
 	short int next_memval_eaddr;	// Value to be written to the memory location specified by the effective address
 	s_effective_addr curr_eaddr;	// Return values of calculated effective address, with flags for statistics.
+	curr_eaddr.EAddr = 0;
 	// - Registers: Current and Next
 	short int reg_PC = DEFAULT_STARTING_ADDRESS;	// Program Counter [0:11]
 	short int reg_IR = 0;	// Current Instruction loaded from the PC.
@@ -240,12 +241,13 @@ int main (int argc, char* argv[])
 	fprintf(fp_branchtrace,"PC [octal]    BRANCH TYPE   TAKEN/NOT TAKEN    TARGET ADDRESS [octal]\n");
 	fprintf(fp_branchtrace,"---------------------------------------------------------------------\n");
 	
-	int counter = 0;
+	//int counter = 0;
 	
 	//======================================================
 	// MAIN LOOP
-	while (!flag_HLT && (counter < 10)) {
-		counter++;
+	//while (!flag_HLT && (counter < 10)) {
+	while (!flag_HLT) {
+		//counter++;
 		effective_address = 0;
 		memval_eaddr = 0;
 		
@@ -279,13 +281,15 @@ int main (int argc, char* argv[])
 							break;
 		}
 		
-		if(debug.instr) {
-			printf("================== INSTRUCTION #%-1d : %s ==================\n",stat_instructions, curr_opcode_str);
+		if(debug.instr || debug.short_mode) {
+			printf("\n================== INSTRUCTION #%-1d : %s ==================\n",stat_instructions, curr_opcode_str);
 		}
 		
 		// STEP 2: CALCULATE EFFECTIVE ADDRESS IF NEEDED
-		curr_eaddr = calc_eaddr(reg_IR, reg_PC, &mem_array[0], fp_tracefile, debug.eaddr);
-		effective_address = curr_eaddr.EAddr;
+		if ((curr_opcode >= 0) && (curr_opcode <= 5)) {
+			curr_eaddr = calc_eaddr(reg_IR, reg_PC, &mem_array[0], fp_tracefile, debug.eaddr);
+			effective_address = curr_eaddr.EAddr;
+		}
 											
 		//--------------------------------
 		// DEBUG PRINTS OF INITIAL VALUES
@@ -307,7 +311,7 @@ int main (int argc, char* argv[])
 			//printf("================== INSTRUCTION #%-1d : %s ==================\n",stat_instructions, curr_opcode_str);
 			printf("  VALUES BEFORE UPDATE:\n");
 			printf("                  PC / IR: %s [%4o] / %s [%4o]\n", bin_str_PC, reg_PC, bin_str_IR, reg_IR);
-			printf("EFFECTIVE ADDRESS / VALUE: %s [%o] \n", bin_str_EAddr, effective_address);
+			printf("        EFFECTIVE ADDRESS: %s [%o] \n", bin_str_EAddr, effective_address);
 			//printf("EFFECTIVE ADDRESS / VALUE: %s [%4o] / %s [%4o]\n", bin_str_EAddr, effective_address, bin_str_memval_EAddr, memval_eaddr);
 			printf("       LINK REGISTER [LR]: %1o   ACCUMULATOR [AC]: %s [%4o]\n", reg_LR, bin_str_AC, reg_AC);
 			printf("     SWITCH REGISTER [SR]: %s [%4o]\n", bin_str_SR, reg_SR);
@@ -319,7 +323,7 @@ int main (int argc, char* argv[])
 		}
 		else if(debug.short_mode)	//Shortened version. Only want if the long version is off.  Shows changes caused at current PC by current OP.
 		{
-			printf("============== PC: %s [%4o] ===============\n", bin_str_PC, reg_PC);
+			printf("              PC: %s [%4o]\n", bin_str_PC, reg_PC);
 			// This would print current values of LR/AC:
 			//printf("  %s   LR: %o AC: %s [%4o]\n", curr_opcode_str, reg_LR, bin_str_AC, reg_AC);
 			/*
@@ -356,7 +360,8 @@ int main (int argc, char* argv[])
 							// AC = AC AND M[EAddr]
 							next_AC = reg_AC & memval_eaddr;
 							// Debug Print
-							if (debug.module) printf("               NEXT AC: [%o]", next_AC);
+							if (debug.module) printf("      CURRENT M[EADDR]: [%o]\n", memval_eaddr);
+							if (debug.module) printf("               NEXT AC: [%o]\n", next_AC);
 							// Update Registers
 							reg_AC = next_AC;
 							break;
@@ -371,7 +376,7 @@ int main (int argc, char* argv[])
 							next_AC = next_AC & word_mask; 	// then clear higher-order bits in next_AC beyond
 															// the size of the word
 							// Debug Print
-							if (debug.module) printf("            NEXT LR/AC: [%o][%o]", next_LR, next_AC);
+							if (debug.module) printf("            NEXT LR/AC: [%o][%o]\n", next_LR, next_AC);
 							// Update Registers
 							reg_AC = next_AC;
 							reg_LR = next_LR;
@@ -388,8 +393,8 @@ int main (int argc, char* argv[])
 								next_PC++; // skip next instruction
 							}
 							// Debug Print
-							if (debug.module) printf("               NEXT PC: [%o]", next_PC);
-							if (debug.module) printf("         NEXT M[EAddr]: [%o]", next_memval_eaddr);
+							if (debug.module) printf("               NEXT PC: [%o]\n", next_PC);
+							if (debug.module) printf("         NEXT M[EAddr]: [%o]\n", next_memval_eaddr);
 							// update branch statistics, and write to branch trace file
 							write_branch_trace(fp_branchtrace, reg_PC, curr_opcode, next_PC, flag_branch_taken, BT_CONDITIONAL, &branch_statistics);
 							// Update Registers
@@ -398,7 +403,7 @@ int main (int argc, char* argv[])
 							write_mem(effective_address, reg_AC, &mem_array[0], fp_tracefile);
 							next_AC = 0;
 							// Debug Print
-							if (debug.module) printf("               NEXT AC: [%o]", next_AC);
+							if (debug.module) printf("               NEXT AC: [%o]\n", next_AC);
 							// Update Registers
 							reg_AC = next_AC;
 							break;
@@ -407,15 +412,15 @@ int main (int argc, char* argv[])
 							// write updated value to memory
 							write_mem(effective_address, next_memval_eaddr, &mem_array[0], fp_tracefile);
 							// Debug Print
-							if (debug.module) printf("               NEXT PC: [%o]", next_PC);
-							if (debug.module) printf("         NEXT M[EAddr]: [%o]", next_memval_eaddr);
+							if (debug.module) printf("               NEXT PC: [%o]\n", next_PC);
+							if (debug.module) printf("         NEXT M[EAddr]: [%o]\n", next_memval_eaddr);
 							// update branch statistics, and write to branch trace file
 							write_branch_trace(fp_branchtrace, reg_PC, curr_opcode, next_PC, BT_TAKEN, BT_UNCONDITIONAL, &branch_statistics);
 							// Update Registers
 							break;
 			case OP_JMP:  	next_PC = effective_address;
 							// Debug Print
-							if (debug.module) printf("               NEXT PC: [%o]", next_PC);
+							if (debug.module) printf("               NEXT PC: [%o]\n", next_PC);
 							// update branch statistics, and write to branch trace file
 							write_branch_trace(fp_branchtrace, reg_PC, curr_opcode, next_PC, BT_TAKEN, BT_UNCONDITIONAL, &branch_statistics);
 							// Update Registers
@@ -431,10 +436,11 @@ int main (int argc, char* argv[])
 							// Debug Print
 							if (debug.module) {
 								printf("               NEXT PC: [%o]\n", next_vals.PC);
-								printf("            NEXT LR/AC: %x/%x[%o/%o]\n",next_vals.LR,next_vals.AC,next_vals.LR,next_vals.AC);
+								printf("            NEXT LR/AC: %x/%x [%o/%o]\n",next_vals.LR,next_vals.AC,next_vals.LR,next_vals.AC);
 							}
 							// update branch statistics, and write to branch trace file
 							write_branch_trace(fp_branchtrace, reg_PC, curr_opcode, next_vals.PC, next_vals.flag_branch_taken, next_vals.flag_branch_type, &branch_statistics);
+							next_PC = next_vals.PC;
 							// Update Registers
 							reg_AC = next_vals.AC;
 							reg_LR = next_vals.LR;
@@ -448,7 +454,7 @@ int main (int argc, char* argv[])
 			// get binary string of the updated AC
 			int_to_binary_str(reg_AC, PDP8_WORD_SIZE, (char**)&bin_str_AC);
 			// print updated values after executing current instruction
-			printf("  %s   LR: %o AC: %s [%4o]\n", curr_opcode_str, reg_LR, bin_str_AC, reg_AC);
+			printf("  %s   LR: %o AC: %s [%4o] AFTER EXECUTION\n", curr_opcode_str, reg_LR, bin_str_AC, reg_AC);
 			printf("-----------------------------------------------------\n");
 		}
 		
