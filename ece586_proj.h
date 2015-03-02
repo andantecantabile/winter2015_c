@@ -304,7 +304,7 @@ void load_memory_array(s_mem_word* ptr_mem_array, char* input_filename, char DEB
 		printf(" STARTING MEMORY: \n");
 		for(i = 0; i <= MEM_ARRAY_MAX; i=i+1) {
 			if ((ptr_mem_array+i)->valid != 0)
-				printf("Address: %3x [%4o] Value: %3x [%4o]\n", i, i, (ptr_mem_array+i)->value,(ptr_mem_array+i)->value); 
+				printf("Address: %03x [%04o] Value: %03x [%04o]\n", i, i, (ptr_mem_array+i)->value,(ptr_mem_array+i)->value); 
 		}
 		printf("=====================================================\n");
 	}
@@ -621,7 +621,7 @@ s_effective_addr calc_eaddr(short int reg_IR, short int reg_PC, s_mem_word* ptr_
 		// Debug Initial Prints:
 		if (debug) {
 			printf("BEGIN EFFECTIVE ADDRESS CALC:\n");
-			printf("         CURRENT INSTR: %s [%o]\n", p_str_IR, reg_IR);
+			printf("         CURRENT INSTR: %s [%04o]\n", p_str_IR, reg_IR);
 			printf(" ");
 			printf("   0   1   2   3   4   5   6   7   8   9  10  11\n");
 			printf(" +---+---+---+---+---+---+---+---+---+---+---+---+\n");
@@ -652,7 +652,7 @@ s_effective_addr calc_eaddr(short int reg_IR, short int reg_PC, s_mem_word* ptr_
 				
 				if (debug) {
 					printf("  -- ZERO PAGE ADDRESSING --\n");
-					printf("     EFFECTIVE ADDRESS: %s [%o]\n", p_str_EAddr, EffectiveAddress);
+					printf("     EFFECTIVE ADDRESS: %s [%04o]\n", p_str_EAddr, EffectiveAddress);
 				}
 				//--------------------------------------------
 			}
@@ -668,7 +668,7 @@ s_effective_addr calc_eaddr(short int reg_IR, short int reg_PC, s_mem_word* ptr_
 				
 				if (debug) {
 					printf("  -- CURRENT PAGE ADDRESSING --\n");
-					printf("     EFFECTIVE ADDRESS: %s [%o]\n", p_str_EAddr, EffectiveAddress);
+					printf("     EFFECTIVE ADDRESS: %s [%04o]\n", p_str_EAddr, EffectiveAddress);
 				}
 				//--------------------------------------------
 			}
@@ -694,8 +694,8 @@ s_effective_addr calc_eaddr(short int reg_IR, short int reg_PC, s_mem_word* ptr_
 					
 					if (debug) {
 						printf("  -- INDIRECT ADDRESSING; ZERO PAGE --\n");
-						printf("INDIRECT ADDR LOCATION: %s [%o]\n", p_str_IndirectAddr, IndirectAddrLoc);
-						printf("     EFFECTIVE ADDRESS: %s [%o]\n", p_str_EAddr, EffectiveAddress);
+						printf("INDIRECT ADDR LOCATION: %s [%04o]\n", p_str_IndirectAddr, IndirectAddrLoc);
+						printf("     EFFECTIVE ADDRESS: %s [%04o]\n", p_str_EAddr, EffectiveAddress);
 					}
 				}
 				else
@@ -712,8 +712,8 @@ s_effective_addr calc_eaddr(short int reg_IR, short int reg_PC, s_mem_word* ptr_
 					
 					if (debug) {
 						printf("  -- INDIRECT ADDRESSING; CURRENT PAGE --\n");
-						printf("INDIRECT ADDR LOCATION: %s [%o]\n", p_str_IndirectAddr, IndirectAddrLoc);
-						printf("     EFFECTIVE ADDRESS: %s [%o]\n", p_str_EAddr, EffectiveAddress);
+						printf("INDIRECT ADDR LOCATION: %s [%04o]\n", p_str_IndirectAddr, IndirectAddrLoc);
+						printf("     EFFECTIVE ADDRESS: %s [%04o]\n", p_str_EAddr, EffectiveAddress);
 					}
 				}
 			  
@@ -739,8 +739,8 @@ s_effective_addr calc_eaddr(short int reg_IR, short int reg_PC, s_mem_word* ptr_
 				if (debug)
 				{
 					printf("  -- AUTO-INDEX ADDRESSING --\n");
-					printf("INDIRECT ADDR LOCATION: %s [%o]\n", p_str_IndirectAddr, IndirectAddrLoc);
-					printf("  Orig M[IndirectAddr]: %s [%o]\n", p_str_EAddr, EffectiveAddress);
+					printf("INDIRECT ADDR LOCATION: %s [%04o]\n", p_str_IndirectAddr, IndirectAddrLoc);
+					printf("  Orig M[IndirectAddr]: %s [%04o]\n", p_str_EAddr, EffectiveAddress);
 				}
 				
 				// Calculate the actual incremented value to be used as the effective address
@@ -755,7 +755,7 @@ s_effective_addr calc_eaddr(short int reg_IR, short int reg_PC, s_mem_word* ptr_
 				ret_EAddr.flag_MemType_AutoIndex = TRUE;
 				
 				if (debug) {
-					printf("     EFFECTIVE ADDRESS: %s [%o]\n", p_str_EAddr, EffectiveAddress);
+					printf("     EFFECTIVE ADDRESS: %s [%04o]\n", p_str_EAddr, EffectiveAddress);
 				}
 			}
 		} // end else where indirect addressing bit = 1
@@ -771,7 +771,7 @@ s_effective_addr calc_eaddr(short int reg_IR, short int reg_PC, s_mem_word* ptr_
 		free(p_str_IR);	
 	//	printf("free() succeeded for p_str_IR\n");
 		
-		if (debug) printf("Calculated Effective Address: %x [%o]\n",EffectiveAddress,EffectiveAddress);
+		if (debug) printf("Calculated Effective Address: %x [%04o]\n",EffectiveAddress,EffectiveAddress);
 		ret_EAddr.EAddr = EffectiveAddress; // save calculated EAddr to return value struct
 	}
 		
@@ -825,7 +825,7 @@ s_updated_vals module_UI (short int IR, short int PC, short int AC, char LR, sho
 	if (debug) {
 		printf(" \n");
 		printf("***************** UI MODULE DEBUG ******************\n");
-		printf("   Current Instr: %s [%o]\n", str_IR, IR);
+		printf("   Current Instr: %s [%04o]\n", str_IR, IR);
 		printf(" \n");
 		printf("   0   1   2   3   4   5   6   7   8   9  10  11\n");
 		printf(" +---+---+---+---+---+---+---+---+---+---+---+---+\n");
@@ -855,7 +855,7 @@ s_updated_vals module_UI (short int IR, short int PC, short int AC, char LR, sho
 				ret_vals.AC = 0;
 				if (debug) {
 					printf(" -- Clear Accumulator\n");
-					printf("                NEW AC: %x [%o]\n", ret_vals.AC, ret_vals.AC);
+					printf("                NEW AC: %03x [%04o]\n", ret_vals.AC, ret_vals.AC);
 				}
 			}
 			if ( ((IR >> (PDP8_WORD_SIZE - 5-1)) & 1) == 1) {
@@ -873,7 +873,7 @@ s_updated_vals module_UI (short int IR, short int PC, short int AC, char LR, sho
 				ret_vals.AC = ~(ret_vals.AC);
 				if (debug) {
 					printf(" -- Complement Accumulator\n");
-					printf("                NEW AC: %x [%o]\n", ret_vals.AC, ret_vals.AC);
+					printf("                NEW AC: %03x [%04o]\n", ret_vals.AC, ret_vals.AC);
 				}
 			}
 			if ( ((IR >> (PDP8_WORD_SIZE - 7-1)) & 1) == 1) {
@@ -895,8 +895,8 @@ s_updated_vals module_UI (short int IR, short int PC, short int AC, char LR, sho
 				
 				if (debug) {
 					printf(" -- Complement Accumulator\n");
-					printf("                NEW AC: %3x [%4o]\n", ret_vals.AC, ret_vals.AC);
-					printf("                NEW LR: %3x [%4o]", ret_vals.LR, ret_vals.LR);
+					printf("                NEW AC: %03x [%04o]\n", ret_vals.AC, ret_vals.AC);
+					printf("                NEW LR: %03x [%04o]", ret_vals.LR, ret_vals.LR);
 				}
 			}
 			
@@ -908,7 +908,7 @@ s_updated_vals module_UI (short int IR, short int PC, short int AC, char LR, sho
 			// each other out and leave the AC unchanged.
 			if ((((IR >> (PDP8_WORD_SIZE - 8-1)) & 1) == 1) && ((IR >> (PDP8_WORD_SIZE - 9-1)) == 1))
 			{
-				fprintf(stderr,"WARNING: Micro Op instruction conflict at PC = [%o]. Rotate Left and Rotate Right enabled simultaneously.", PC);
+				fprintf(stderr,"WARNING: Micro Op instruction conflict at PC = [%04o]. Rotate Left and Rotate Right enabled simultaneously.", PC);
 			}
 			// Rotate right:
 			// Check bit 8, which indicates a rotate right operation
@@ -936,8 +936,8 @@ s_updated_vals module_UI (short int IR, short int PC, short int AC, char LR, sho
 					// Print out new calculated values
 					if (debug) {
 						printf(" -- Rotate Accumulator and Link Right\n");
-						printf("                NEW LR: %x [%o]\n", ret_vals.LR, ret_vals.LR);
-						printf("                NEW AC: %x [%o]\n", ret_vals.AC, ret_vals.AC);
+						printf("                NEW LR: %03x [%04o]\n", ret_vals.LR, ret_vals.LR);
+						printf("                NEW AC: %03x [%04o]\n", ret_vals.AC, ret_vals.AC);
 					}
 				}
 				else { // Otherwise bit 10 (the 0/1 bit) is 1 --> rotate 2 positions right
@@ -957,8 +957,8 @@ s_updated_vals module_UI (short int IR, short int PC, short int AC, char LR, sho
 					// Print out new calculated values
 					if (debug) {
 						printf(" -- Rotate Accumulator and Link Right\n");
-						printf("                NEW LR: %x [%o]\n", ret_vals.LR, ret_vals.LR);
-						printf("                NEW AC: %x [%o]\n", ret_vals.AC, ret_vals.AC);
+						printf("                NEW LR: %03x [%04o]\n", ret_vals.LR, ret_vals.LR);
+						printf("                NEW AC: %03x [%04o]\n", ret_vals.AC, ret_vals.AC);
 					}
 				}
 			} // end rotate right
@@ -983,8 +983,8 @@ s_updated_vals module_UI (short int IR, short int PC, short int AC, char LR, sho
 					// Print out new calculated values
 					if (debug) {
 						printf(" -- Rotate Accumulator and Link Left\n");
-						printf("                NEW LR: %x [%o]\n", ret_vals.LR, ret_vals.LR);
-						printf("                NEW AC: %x [%o]\n", ret_vals.AC, ret_vals.AC);
+						printf("                NEW LR: %03x [%04o]\n", ret_vals.LR, ret_vals.LR);
+						printf("                NEW AC: %03x [%04o]\n", ret_vals.AC, ret_vals.AC);
 					}
 				}
 				else { // Otherwise bit 10(the 0/1 bit) is 1 --> rotate 2 positions left
@@ -1009,8 +1009,8 @@ s_updated_vals module_UI (short int IR, short int PC, short int AC, char LR, sho
 					// Print out new calculated values
 					if (debug) {
 						printf(" -- Rotate Accumulator and Link Left Twice\n");
-						printf("                NEW LR: %x [%o]\n", ret_vals.LR, ret_vals.LR);
-						printf("                NEW AC: %x [%o]\n", ret_vals.AC, ret_vals.AC);
+						printf("                NEW LR: %03x [%04o]\n", ret_vals.LR, ret_vals.LR);
+						printf("                NEW AC: %03x [%04o]\n", ret_vals.AC, ret_vals.AC);
 					}
 				}
 			} // end rotate left operation
@@ -1164,7 +1164,7 @@ s_updated_vals module_UI (short int IR, short int PC, short int AC, char LR, sho
 				ret_vals.AC = 0;
 				if (debug) {
 					printf(" -- CLA - Clear Accumulator\n");
-					printf("                NEW AC: %x [%o]\n", ret_vals.AC, ret_vals.AC);
+					printf("                NEW AC: %03x [%04o]\n", ret_vals.AC, ret_vals.AC);
 				}
 			}
 			
@@ -1172,13 +1172,13 @@ s_updated_vals module_UI (short int IR, short int PC, short int AC, char LR, sho
 			if (((IR >> (PDP8_WORD_SIZE - 9-1)) & 1) == 1) {
 				if (debug) {
 					printf(" -- OSR - Or Switch Register with Accumulator\n");
-					printf("           Previous AC: %x [%o]\n", ret_vals.AC, ret_vals.AC);
-					printf("           Previous SR: %x [%o]\n", ret_vals.SR, ret_vals.SR);
+					printf("           Previous AC: %03x [%04o]\n", ret_vals.AC, ret_vals.AC);
+					printf("           Previous SR: %03x [%04o]\n", ret_vals.SR, ret_vals.SR);
 				}
 				
 				ret_vals.AC = ret_vals.AC | ret_vals.SR;
 				
-				if (debug) printf("                NEW AC: %x [%o]\n", ret_vals.AC, ret_vals.AC);
+				if (debug) printf("                NEW AC: %03x [%04o]\n", ret_vals.AC, ret_vals.AC);
 			}
 			
 			// HLT - HaLT: check if bit 10 is set
@@ -1194,7 +1194,7 @@ s_updated_vals module_UI (short int IR, short int PC, short int AC, char LR, sho
 		else { // Bit 11 is set to 1: Group 3 Microinstructions
 			// These are not implemented, so should be noted as 
 			// illegal/unrecognized instructions
-			fprintf(stderr,"WARNING: Group 3 MicroOp called at PC = [%o]. Group 3 MicroOps not enabled in simulation.\n", PC);
+			fprintf(stderr,"WARNING: Group 3 MicroOp called at PC = [%04o]. Group 3 MicroOps not enabled in simulation.\n", PC);
 			// Note that next values were initialized to be equal to current values,
 			// so no changes will be made to the registers. (Except for the pre-incremented PC,
 			// which will just go to the next instruction as it should.)

@@ -3,3 +3,10 @@
 0
 0
 1
+=========================================================
+The debug parameters set above are as follows: 
+mem_display - Memory contents before and after programs
+instr       - Values of registers for each instruction
+module      - Op Code Modules (intermediate values)
+eaddr       - Effective Address 
+short_mode  - Shortened DEBUG for checking uI ops
