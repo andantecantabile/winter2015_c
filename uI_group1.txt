@@ -1,0 +1,32 @@
+/ Program : micro Ops Group 1
+/
+/
+/-------------------------------------------
+/
+/ Code Section
+/
+*0200			/ start at address 0200
+Main, 	
+	cla cll 	/ clear AC and Link
+	tad A1 		/ add A to Accumulator
+	dca B1		/ write to memory
+	tad A2		/ Adds 1 bit, should set Link bit
+	dca B2		/ write to memory
+	
+	
+	
+	hlt 		/ Halt program
+	jmp Main	/ To continue - goto Main
+/
+/ Data Section
+/
+*0250 			/ place data at address 0250
+A1, 7777		/ A is all 1s 
+A2, 1			/ 1 bit
+
+				/Results
+B1, 0			/ Expect 7777
+B2, 0			/ Expect 7777
+
+
+$Main 			/ End of Program; Main is entry point

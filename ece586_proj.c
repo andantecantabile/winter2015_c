@@ -238,8 +238,8 @@ int main (int argc, char* argv[])
 	// Note: Leave trace files open for append.
 	
 	// print header for branch trace file
-	fprintf(fp_branchtrace,"PC [octal]    BRANCH TYPE   TAKEN/NOT TAKEN    TARGET ADDRESS [octal]\n");
-	fprintf(fp_branchtrace,"---------------------------------------------------------------------\n");
+	fprintf(fp_branchtrace,"PC [octal]    BRANCH TYPE         TAKEN/NOT TAKEN    TARGET ADDRESS [octal]\n");
+	fprintf(fp_branchtrace,"---------------------------------------------------------------------------\n");
 	
 	//int counter = 0;
 	

@@ -369,25 +369,25 @@ void write_branch_trace(FILE* fp_branchtrace, short int PC, char opcode, short i
 	switch (opcode) {
 		case OP_ISZ:
 			if (flag_branch_taken == BT_TAKEN) {
-				fprintf(fp_branchtrace, "%x [%o]    CONDITIONAL [ISZ]   TAKEN              %x [%o]\n", PC, PC, target_address, target_address);
+				fprintf(fp_branchtrace, "%03x [%04o]    CONDITIONAL [ISZ]   TAKEN              %03x [%04o]\n", PC, PC, target_address, target_address);
 				(branch_stats->ISZ_t_count)++;
 				(branch_stats->total_cond_t_count)++;
 			}
 			else {
-				fprintf(fp_branchtrace, "%x [%o]    CONDITIONAL [ISZ]   NOT TAKEN          %x [%o]\n", PC, PC, target_address, target_address);
+				fprintf(fp_branchtrace, "%03x [%04o]    CONDITIONAL [ISZ]   NOT TAKEN          %03x [%04o]\n", PC, PC, target_address, target_address);
 				(branch_stats->ISZ_nt_count)++;
 				(branch_stats->total_cond_nt_count)++;
 			}
 			break;
 		
 		case OP_JMS:
-			fprintf(fp_branchtrace, "%x [%o]    UNCONDITIONAL [JMS] TAKEN              %x [%o]\n", PC, PC, target_address, target_address);
+			fprintf(fp_branchtrace, "%03x [%04o]    UNCONDITIONAL [JMS] TAKEN              %03x [%04o]\n", PC, PC, target_address, target_address);
 			(branch_stats->JMS_t_count)++;
 			(branch_stats->total_uncond_t_count)++;
 			break;
 		
 		case OP_JMP:
-			fprintf(fp_branchtrace, "%x [%o]    UNCONDITIONAL [JMP] TAKEN              %x [%o]\n", PC, PC, target_address, target_address);
+			fprintf(fp_branchtrace, "%03x [%04o]    UNCONDITIONAL [JMP] TAKEN              %03x [%04o]\n", PC, PC, target_address, target_address);
 			(branch_stats->JMP_t_count)++;
 			(branch_stats->total_uncond_t_count)++;
 			break;
@@ -395,24 +395,24 @@ void write_branch_trace(FILE* fp_branchtrace, short int PC, char opcode, short i
 		case OP_UI:
 			if (flag_branch_type == BT_UNCONDITIONAL) {
 				if (flag_branch_taken == BT_TAKEN) {
-					fprintf(fp_branchtrace, "%x [%o]    UNCONDITIONAL [UI]  TAKEN              %x [%o]\n", PC, PC, target_address, target_address);
+					fprintf(fp_branchtrace, "%03x [%04o]    UNCONDITIONAL [UI]  TAKEN              %03x [%04o]\n", PC, PC, target_address, target_address);
 					(branch_stats->UI_uncond_t_count)++;
 					(branch_stats->total_uncond_t_count)++;
 				}
 				else {
-					fprintf(fp_branchtrace, "%x [%o]    UNCONDITIONAL [UI]  NOT TAKEN          %x [%o]\n", PC, PC, target_address, target_address);
+					fprintf(fp_branchtrace, "%03x [%04o]    UNCONDITIONAL [UI]  NOT TAKEN          %03x [%04o]\n", PC, PC, target_address, target_address);
 					(branch_stats->UI_uncond_nt_count)++; // NOTE: This should never be incremented. If it is, there is an error somewhere!
 				}
 			}
 			else if (flag_branch_type == BT_CONDITIONAL)
 			{
 				if (flag_branch_taken == BT_TAKEN) {
-					fprintf(fp_branchtrace, "%x [%o]    CONDITIONAL [UI]    TAKEN              %x [%o]\n", PC, PC, target_address, target_address);
+					fprintf(fp_branchtrace, "%03x [%04o]    CONDITIONAL [UI]    TAKEN              %03x [%04o]\n", PC, PC, target_address, target_address);
 					(branch_stats->UI_cond_t_count)++;
 					(branch_stats->total_cond_t_count)++;
 				}
 				else {
-					fprintf(fp_branchtrace, "%x [%o]    CONDITIONAL [UI]    NOT TAKEN          %x [%o]\n", PC, PC, target_address, target_address);
+					fprintf(fp_branchtrace, "%03x [%04o]    CONDITIONAL [UI]    NOT TAKEN          %03x [%04o]\n", PC, PC, target_address, target_address);
 					(branch_stats->UI_cond_nt_count)++;
 					(branch_stats->total_cond_nt_count)++;
 				}
@@ -445,12 +445,12 @@ short int read_mem(short int address, char read_type, s_mem_word* ptr_mem_array,
 	// Check if the valid bit of the requested address was set. 
 	// If not, print a warning in the trace file.
 	if ((ptr_mem_array+address)->valid == 1) {
-		fprintf(fp_tracefile, "%d %x\n", read_type, address);
+		fprintf(fp_tracefile, "%d %03x\n", read_type, address);
 	}
 	else
 	{
-		fprintf(fp_tracefile, "%d %x\n", read_type, address);
-		fprintf(stderr,"[Warning: Invalid memory location accessed at %x [%o]; read_type: %d\n", address, address, read_type);
+		fprintf(fp_tracefile, "%d %03x\n", read_type, address);
+		fprintf(stderr,"[Warning: Invalid memory location accessed at %3x [%4o]; read_type: %d\n", address, address, read_type);
 	}
 	
 	return (ptr_mem_array+address)->value;
@@ -472,7 +472,7 @@ short int read_mem(short int address, char read_type, s_mem_word* ptr_mem_array,
 void write_mem(short int address, short int value, s_mem_word* ptr_mem_array, FILE* fp_tracefile) {
 	// Append current opcode and address in trace file
 	// Note, no "opcode" input, because there is only one WRITE option.
-	fprintf(fp_tracefile, "%d %x\n", TF_WRITE, address);
+	fprintf(fp_tracefile, "%d %03x\n", TF_WRITE, address);
 
 	// update value at given address in the mem_array
 	(ptr_mem_array+address)->value = value;
