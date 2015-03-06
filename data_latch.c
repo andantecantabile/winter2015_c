@@ -32,9 +32,28 @@ typedef struct _gtkMemoryLine
 {
     GtkWidget *label_arrow;
 	GtkWidget *button_breakpoint;
-	GtkWidget *label_addr;
-	GtkWidget *label_value;
+	//GtkWidget *label_addr;
+	//GtkWidget *label_value;
+	GtkWidget *label_addr_octal;
+	GtkWidget *label_addr_hex;
+	GtkWidget *label_value_octal;
+	GtkWidget *label_value_hex;
 } gtkMemoryLine;
+
+// struct for label widgets in the listing of registers
+typedef struct _gtkRegisterValues
+{
+	GtkWidget *label_last_PC_hex;
+	GtkWidget *label_last_PC_octal;
+	GtkWidget *label_last_IR_hex;
+	GtkWidget *label_last_IR_octal;
+	GtkWidget *label_last_IR_binary;
+	GtkWidget *label_LR;
+	GtkWidget *label_AC_hex;
+	GtkWidget *label_AC_octal;
+	GtkWidget *label_SR_hex;
+	GtkWidget *label_SR_octal;
+} gtkRegisterValues;
 
 // hide and display the status bar
 void toggle_statusbar(GtkWidget *widget, gpointer statusbar) 
@@ -137,6 +156,10 @@ int main (int argc, char* argv[])
   GtkWidget *mem_separator;
   GtkWidget *lbl_vtable_mem_header_addr;
   GtkWidget *lbl_vtable_mem_header_value;
+  GtkWidget *lbl_vtable_mem_header_octal1;
+  GtkWidget *lbl_vtable_mem_header_hex1;
+  GtkWidget *lbl_vtable_mem_header_octal2;
+  GtkWidget *lbl_vtable_mem_header_hex2;
   GtkWidget *vtable_mem;
   GtkWidget *vbox;
   GtkWidget *vbox2;
@@ -283,8 +306,12 @@ int main (int argc, char* argv[])
   
   /* MEMORY TABLE HEADER SET UP */
   // create table header labels
-  lbl_vtable_mem_header_addr = gtk_label_new("\nAddress");
-  lbl_vtable_mem_header_value = gtk_label_new("Value in Octal\n[Hexadecimal]");
+  lbl_vtable_mem_header_addr = gtk_label_new("Address");
+  lbl_vtable_mem_header_value = gtk_label_new("Value");
+  lbl_vtable_mem_header_octal1 = gtk_label_new("(Octal)");
+  lbl_vtable_mem_header_hex1 = gtk_label_new("(Hex)");
+  lbl_vtable_mem_header_octal2 = gtk_label_new("(Octal)");
+  lbl_vtable_mem_header_hex2 = gtk_label_new("(Hex)");
   mem_separator = gtk_hseparator_new ();
   /*
   vtable_mem_header = gtk_table_new(4, 4, TRUE);
@@ -299,14 +326,14 @@ int main (int argc, char* argv[])
   */
   
   /* MEMORY TABLE SET UP */
-  vtable_mem = gtk_table_new(PDP8_MEMSIZE+1, 4, FALSE);
+  vtable_mem = gtk_table_new(PDP8_MEMSIZE+3, 6, FALSE);
   gtk_table_set_row_spacings(GTK_TABLE(vtable_mem), 1);
   gtk_table_set_col_spacings(GTK_TABLE(vtable_mem), 1);
   
   /* SCROLLED WINDOW INSTANTIATION */
   scrolled_window = gtk_scrolled_window_new (NULL, NULL);  
-  gtk_container_border_width (GTK_CONTAINER (scrolled_window), 1);
-  gtk_widget_set_usize(scrolled_window, 400, 400);
+  gtk_container_border_width (GTK_CONTAINER (scrolled_window), 10);
+  gtk_widget_set_usize(scrolled_window, 400, 450);
   // make horizontal scrollbar policy automatic and 
   // make the vertical scrollbar policy always on.
   gtk_scrolled_window_set_policy (GTK_SCROLLED_WINDOW(scrolled_window), GTK_POLICY_AUTOMATIC, GTK_POLICY_ALWAYS);
@@ -315,11 +342,19 @@ int main (int argc, char* argv[])
   gtk_widget_show(scrolled_window);
   
   // attach column labels and separator to the table
-  gtk_table_attach_defaults (GTK_TABLE (vtable_mem), lbl_vtable_mem_header_addr, 2, 3, 0, 1);
-  gtk_table_attach_defaults (GTK_TABLE (vtable_mem), lbl_vtable_mem_header_value, 3, 4, 0, 1);
-  gtk_table_attach_defaults (GTK_TABLE (vtable_mem), mem_separator, 0, 4, 1, 2);
+  gtk_table_attach_defaults (GTK_TABLE (vtable_mem), lbl_vtable_mem_header_addr, 2, 4, 0, 1);
+  gtk_table_attach_defaults (GTK_TABLE (vtable_mem), lbl_vtable_mem_header_value, 4, 6, 0, 1);
+  gtk_table_attach_defaults (GTK_TABLE (vtable_mem), lbl_vtable_mem_header_octal1, 2, 3, 1, 2);
+  gtk_table_attach_defaults (GTK_TABLE (vtable_mem), lbl_vtable_mem_header_hex1, 3, 4, 1, 2);
+  gtk_table_attach_defaults (GTK_TABLE (vtable_mem), lbl_vtable_mem_header_octal2, 4, 5, 1, 2);
+  gtk_table_attach_defaults (GTK_TABLE (vtable_mem), lbl_vtable_mem_header_hex2, 5, 6, 1, 2);
+  gtk_table_attach_defaults (GTK_TABLE (vtable_mem), mem_separator, 0, 6, 2, 3);
   gtk_widget_show(lbl_vtable_mem_header_addr);
   gtk_widget_show(lbl_vtable_mem_header_value);
+  gtk_widget_show(lbl_vtable_mem_header_octal1);
+  gtk_widget_show(lbl_vtable_mem_header_hex1);
+  gtk_widget_show(lbl_vtable_mem_header_octal2);
+  gtk_widget_show(lbl_vtable_mem_header_hex2);
   gtk_widget_show(mem_separator);
   
   //gtk_container_add(GTK_CONTAINER(scrolled_window), vtable_mem);
@@ -334,8 +369,12 @@ int main (int argc, char* argv[])
 
 	  mem_image[i].label_arrow = gtk_image_new_from_stock(GTK_STOCK_GO_FORWARD, GTK_ICON_SIZE_SMALL_TOOLBAR);
 	  mem_image[i].button_breakpoint = gtk_toggle_button_new();
-	  mem_image[i].label_addr = gtk_label_new("");
-	  mem_image[i].label_value = gtk_label_new("");
+	  //mem_image[i].label_addr = gtk_label_new("");
+	  //mem_image[i].label_value = gtk_label_new("");
+	  mem_image[i].label_addr_octal = gtk_label_new("");
+	  mem_image[i].label_value_octal = gtk_label_new("");
+	  mem_image[i].label_addr_hex = gtk_label_new("");
+	  mem_image[i].label_value_hex = gtk_label_new("");
 	  
 	  // attach widgets to the table
 	//  gtk_table_attach_defaults (GTK_TABLE (vtable_mem), mem_image[i].label_arrow, 0, 1, i, i+1);
@@ -358,7 +397,7 @@ int main (int argc, char* argv[])
   }
   
   // Resize table afterwards [rows, cols]
-  gtk_table_resize (GTK_TABLE(vtable_mem),3,4);
+  gtk_table_resize (GTK_TABLE(vtable_mem),4,4);
   
   /* STATUS BAR INSTANTIATION */
   statusbar = gtk_statusbar_new();
@@ -400,8 +439,10 @@ int main (int argc, char* argv[])
 void display_memory_array( s_mem_word* ptr_mem_array, GtkWidget* vtable) {
 	int i;	// loop counter
 	int k; // display index
-	char curr_addr[50]; // address location to write the current data.
-	char curr_data[50]; // current data to be written.
+	char curr_addr_octal[10]; // address location in octal
+	char curr_addr_hex[10]; // address location in hex.
+	char curr_data_octal[10]; // current data in octal.
+	char curr_data_hex[10];	// current data in hex.
 	
 	// set table headers
 //	GtkWidget* lbl_header_addr = gtk_label_new("\nAddress");
@@ -411,11 +452,11 @@ void display_memory_array( s_mem_word* ptr_mem_array, GtkWidget* vtable) {
 //	gtk_table_attach_defaults (GTK_TABLE (vtable), lbl_header_addr, 1, 2, 0, 1);
 //	gtk_table_attach_defaults (GTK_TABLE (vtable), lbl_header_value, 2, 3, 0, 1);
 	
-	// start populating table at the 2nd row
-	k = 2;
+	// start populating table at the 4th row
+	k = 3;
 	
 	// Resize table initially [rows, cols]
-	gtk_table_resize (GTK_TABLE(vtable),PDP8_MEMSIZE+2,4);
+	gtk_table_resize (GTK_TABLE(vtable),PDP8_MEMSIZE+3,4);
 	
 	// display any lines that are valid
 	for(i = 0; i <= MEM_ARRAY_MAX; i=i+1) {
@@ -423,17 +464,26 @@ void display_memory_array( s_mem_word* ptr_mem_array, GtkWidget* vtable) {
 			//curr_addr = i;
 			//curr_data = (ptr_mem_array+curr_addr)->value;
 			
-			sprintf(curr_addr, "%04o [%03x]", i, i);
-			sprintf(curr_data, "%04o [%03x]", (ptr_mem_array+i)->value, (ptr_mem_array+i)->value);
+			// save strings of the address and data
+			//sprintf(curr_addr, "%04o [%03x]", i, i);
+			//sprintf(curr_data, "%04o [%03x]", (ptr_mem_array+i)->value, (ptr_mem_array+i)->value);
+			sprintf(curr_addr_octal, "%04o", i);
+			sprintf(curr_addr_hex,"%03x", i);
+			sprintf(curr_data_octal, "%04o", (ptr_mem_array+i)->value);
+			sprintf(curr_data_hex, "%03x", (ptr_mem_array+i)->value);
 			
 			// attach widgets to the table
 			gtk_table_attach_defaults (GTK_TABLE (vtable), mem_image[k].label_arrow, 0, 1, k, k+1);
 			gtk_table_attach_defaults (GTK_TABLE (vtable), mem_image[k].button_breakpoint, 1, 2, k, k+1);
-			gtk_table_attach_defaults (GTK_TABLE (vtable), mem_image[k].label_addr, 2, 3, k, k+1);
-			gtk_table_attach_defaults (GTK_TABLE (vtable), mem_image[k].label_value, 3, 4, k, k+1);
+			//gtk_table_attach_defaults (GTK_TABLE (vtable), mem_image[k].label_addr, 2, 3, k, k+1);
+			//gtk_table_attach_defaults (GTK_TABLE (vtable), mem_image[k].label_value, 3, 4, k, k+1);
+			gtk_table_attach_defaults (GTK_TABLE (vtable), mem_image[k].label_addr_octal, 2, 3, k, k+1);
+			gtk_table_attach_defaults (GTK_TABLE (vtable), mem_image[k].label_addr_hex, 3, 4, k, k+1);
+			gtk_table_attach_defaults (GTK_TABLE (vtable), mem_image[k].label_value_octal, 4, 5, k, k+1);
+			gtk_table_attach_defaults (GTK_TABLE (vtable), mem_image[k].label_value_hex, 5, 6, k, k+1);
 
 			// attach "clicked" signal for breakpoint button
-			gtk_signal_connect (GTK_OBJECT (mem_image[k].button_breakpoint), "clicked", GTK_SIGNAL_FUNC (toggle_breakpoint_button_callback), (gpointer) curr_addr);
+			gtk_signal_connect (GTK_OBJECT (mem_image[k].button_breakpoint), "clicked", GTK_SIGNAL_FUNC (toggle_breakpoint_button_callback), (gpointer) curr_addr_octal);
 			  
 			// show elements:
 			if (reg_PC == i) {
@@ -441,12 +491,20 @@ void display_memory_array( s_mem_word* ptr_mem_array, GtkWidget* vtable) {
 				gtk_widget_show (mem_image[k].label_arrow);
 			}
 			gtk_widget_show (mem_image[k].button_breakpoint);
-			gtk_widget_show (mem_image[k].label_addr);
-			gtk_widget_show (mem_image[k].label_value);
+			//gtk_widget_show (mem_image[k].label_addr);
+			//gtk_widget_show (mem_image[k].label_value);
+			gtk_widget_show (mem_image[k].label_addr_octal);
+			gtk_widget_show (mem_image[k].label_value_octal);
+			gtk_widget_show (mem_image[k].label_addr_hex);
+			gtk_widget_show (mem_image[k].label_value_hex);
 			  
 			// to change the label's text after creation:
-			gtk_label_set_text( (GtkLabel*) mem_image[k].label_addr, curr_addr );
-			gtk_label_set_text( (GtkLabel*) mem_image[k].label_value, curr_data );
+			//gtk_label_set_text( (GtkLabel*) mem_image[k].label_addr, curr_addr );
+			//gtk_label_set_text( (GtkLabel*) mem_image[k].label_value, curr_data );
+			gtk_label_set_text( (GtkLabel*) mem_image[k].label_addr_octal, curr_addr_octal );
+			gtk_label_set_text( (GtkLabel*) mem_image[k].label_value_octal, curr_data_octal );
+			gtk_label_set_text( (GtkLabel*) mem_image[k].label_addr_hex, curr_addr_hex );
+			gtk_label_set_text( (GtkLabel*) mem_image[k].label_value_hex, curr_data_hex );
 			
 			k++; // increment the display index
 		}
