@@ -25,6 +25,7 @@
 //=========================================================
 
 void execute_instructions();
+void display_memory_array( s_mem_word* ptr_mem_array, GtkWidget* vtable);
 
 // struct for widgets included for a single line in the memory image
 typedef struct _gtkMemoryLine
@@ -43,6 +44,19 @@ void toggle_statusbar(GtkWidget *widget, gpointer statusbar)
   } else {
     gtk_widget_hide(statusbar);
   }
+}
+
+// set/remove breakpoints
+void toggle_breakpoint_button_callback (GtkWidget *widget, gpointer data)
+{
+    if (GTK_TOGGLE_BUTTON (widget)->active) 
+    {
+        /* If control reaches here, the toggle button is down */
+    
+    } else {
+    
+        /* If control reaches here, the toggle button is up */
+    }
 }
 
 /* GLOBAL VARIABLES */
@@ -105,29 +119,24 @@ int stat_ui = 0;
 
 int main (int argc, char* argv[])
 {
+  int i;
+  
   // CHECK COMMAND LINE ARGUMENTS:
   if (argc < 2) {
   fprintf (stderr, "Usage: <command> <inputfile>\n");
   fprintf (stderr, "Usage: <command> <inputfile> <switch_register>\n");
   exit (1);
   }
-
-  // store input filename
-  input_filename = argv[1];
-  // if more than 2 arguments given, third argument is the Switch Register value
-  if (argc > 2) reg_SR = atoi(argv[2]); 
-
-  // Read in debug flag settings from param.txt.
-  read_param_file(&debug, param_filename);
-
-  // Read in memory from input file.
-  load_memory_array(&mem_array[0], input_filename, debug.mem_display);
 	
   // WINDOW ITEMS
   GtkWidget *window;
   GtkWidget *scrolled_window;
   GtkWidget *vtable1;
   GtkWidget *vframe_mem;
+  GtkWidget *vtable_mem_header;
+  GtkWidget *mem_separator;
+  GtkWidget *lbl_vtable_mem_header_addr;
+  GtkWidget *lbl_vtable_mem_header_value;
   GtkWidget *vtable_mem;
   GtkWidget *vbox;
   GtkWidget *vbox2;
@@ -156,6 +165,8 @@ int main (int argc, char* argv[])
   GtkToolItem *toolitemsep;
   GtkToolItem *toolitem_start;
   GtkToolItem *toolitem_step;
+  
+  char buffer[1024];
 
   GtkAccelGroup *accel_group = NULL;
 
@@ -228,11 +239,14 @@ int main (int argc, char* argv[])
   gtk_toolbar_insert(GTK_TOOLBAR(toolbar), toolitem_step, -1); 
 
   gtk_box_pack_start(GTK_BOX(vbox), toolbar, FALSE, FALSE, 0);
+  gtk_widget_show_all(vbox);
+  //gtk_widget_show(vbox);
   
   // create vbox2 to contain updated contents on execution of the simulator
   vbox2 = gtk_vbox_new(FALSE, 0);
   // recall that parameters 3 - 5 are for: expand, fill, padding.
   gtk_box_pack_start(GTK_BOX(vbox), vbox2, TRUE, TRUE, 0);
+  gtk_widget_show(vbox2);
   
   // create vtable1 to contain the register values on the left hand side and 
   // the memory table (scrolled window) on the right hand side.
@@ -248,6 +262,7 @@ int main (int argc, char* argv[])
   //gtk_box_pack_start(GTK_BOX(vbox), vbox2, FALSE, TRUE, 1);
   // (left col, right col, top row, bottom row, xoptions, yoptions, xpadding, ypadding)
   gtk_table_attach(GTK_TABLE(vtable1),vbox3, 2, 4, 0, 4, 0, 0, 2, 2);
+  gtk_widget_show(vbox3);
   
   /* MEMORY DATA FRAME */
   vframe_mem = gtk_frame_new(NULL);
@@ -264,15 +279,33 @@ int main (int argc, char* argv[])
   // create vbox4 to contain the memory scrolled window and its header
   vbox4 = gtk_vbox_new(FALSE, 0);
   gtk_container_add(GTK_CONTAINER(vframe_mem),vbox4);
+  gtk_widget_show(vbox4);
+  
+  /* MEMORY TABLE HEADER SET UP */
+  // create table header labels
+  lbl_vtable_mem_header_addr = gtk_label_new("\nAddress");
+  lbl_vtable_mem_header_value = gtk_label_new("Value in Octal\n[Hexadecimal]");
+  mem_separator = gtk_hseparator_new ();
+  /*
+  vtable_mem_header = gtk_table_new(4, 4, TRUE);
+  gtk_table_set_row_spacings(GTK_TABLE(vtable_mem_header), 0);
+  gtk_table_set_col_spacings(GTK_TABLE(vtable_mem_header), 0);
+  // attach labels to the header table
+  gtk_table_attach_defaults (GTK_TABLE (vtable_mem_header), lbl_vtable_mem_header_addr, 1, 2, 0, 1);
+  gtk_table_attach_defaults (GTK_TABLE (vtable_mem_header), lbl_vtable_mem_header_value, 2, 3, 0, 1);
+  gtk_widget_show_all(vtable_mem_header);
+  // add header table to vbox4
+  gtk_box_pack_start(GTK_BOX(vbox4), vtable_mem_header, FALSE, FALSE, 0);
+  */
   
   /* MEMORY TABLE SET UP */
-  vtable_mem = gtk_table_new(4, 4, TRUE);
-  gtk_table_set_row_spacings(GTK_TABLE(vtable_mem), 2);
-  gtk_table_set_col_spacings(GTK_TABLE(vtable_mem), 2);
+  vtable_mem = gtk_table_new(PDP8_MEMSIZE+1, 4, FALSE);
+  gtk_table_set_row_spacings(GTK_TABLE(vtable_mem), 1);
+  gtk_table_set_col_spacings(GTK_TABLE(vtable_mem), 1);
   
   /* SCROLLED WINDOW INSTANTIATION */
   scrolled_window = gtk_scrolled_window_new (NULL, NULL);  
-  gtk_container_border_width (GTK_CONTAINER (scrolled_window), 10);
+  gtk_container_border_width (GTK_CONTAINER (scrolled_window), 1);
   gtk_widget_set_usize(scrolled_window, 400, 400);
   // make horizontal scrollbar policy automatic and 
   // make the vertical scrollbar policy always on.
@@ -281,9 +314,51 @@ int main (int argc, char* argv[])
   gtk_box_pack_start(GTK_BOX(vbox4), scrolled_window, TRUE, TRUE, 0);
   gtk_widget_show(scrolled_window);
   
+  // attach column labels and separator to the table
+  gtk_table_attach_defaults (GTK_TABLE (vtable_mem), lbl_vtable_mem_header_addr, 2, 3, 0, 1);
+  gtk_table_attach_defaults (GTK_TABLE (vtable_mem), lbl_vtable_mem_header_value, 3, 4, 0, 1);
+  gtk_table_attach_defaults (GTK_TABLE (vtable_mem), mem_separator, 0, 4, 1, 2);
+  gtk_widget_show(lbl_vtable_mem_header_addr);
+  gtk_widget_show(lbl_vtable_mem_header_value);
+  gtk_widget_show(mem_separator);
+  
   //gtk_container_add(GTK_CONTAINER(scrolled_window), vtable_mem);
   gtk_scrolled_window_add_with_viewport(GTK_SCROLLED_WINDOW(scrolled_window), vtable_mem);
   gtk_widget_show(vtable_mem);
+  
+  // Create all the labels and buttons for the memory array, 
+  // but do not display them yet.
+  for (i = 0; i < PDP8_MEMSIZE; i++)
+  {
+	  //sprintf (buffer, "cell (%d,%d)\n", i, j);
+
+	  mem_image[i].label_arrow = gtk_image_new_from_stock(GTK_STOCK_GO_FORWARD, GTK_ICON_SIZE_SMALL_TOOLBAR);
+	  mem_image[i].button_breakpoint = gtk_toggle_button_new();
+	  mem_image[i].label_addr = gtk_label_new("");
+	  mem_image[i].label_value = gtk_label_new("");
+	  
+	  // attach widgets to the table
+	//  gtk_table_attach_defaults (GTK_TABLE (vtable_mem), mem_image[i].label_arrow, 0, 1, i, i+1);
+	//  gtk_table_attach_defaults (GTK_TABLE (vtable_mem), mem_image[i].button_breakpoint, 1, 2, i, i+1);
+	//  gtk_table_attach_defaults (GTK_TABLE (vtable_mem), mem_image[i].label_addr, 2, 3, i, i+1);
+	//  gtk_table_attach_defaults (GTK_TABLE (vtable_mem), mem_image[i].label_value, 3, 4, i, i+1);
+
+	  // attach "clicked" signal for breakpoint button
+	  //gtk_signal_connect (GTK_OBJECT (button), "clicked", GTK_SIGNAL_FUNC (toggle_breakpoint_button_callback), (gpointer) "memory_index");
+	  
+	  // show elements:
+	  //gtk_widget_show (mem_image[i].label_arrow);
+	  //gtk_widget_show (mem_image[i].button_breakpoint);
+	  //gtk_widget_show (mem_image[i].label_addr);
+	  //gtk_widget_show (mem_image[i].label_value);
+	  
+	  // to change the label's text after creation:
+	  //gtk_label_set_text( (GtkLabel) mem_image[i].label_addr, str_address );
+	  //gtk_label_set_text( (GtkLabel) mem_image[i].label_value, str_value );
+  }
+  
+  // Resize table afterwards [rows, cols]
+  gtk_table_resize (GTK_TABLE(vtable_mem),3,4);
   
   /* STATUS BAR INSTANTIATION */
   statusbar = gtk_statusbar_new();
@@ -299,19 +374,89 @@ int main (int argc, char* argv[])
 
   g_signal_connect(G_OBJECT(quit), "activate",
       G_CALLBACK(gtk_main_quit), NULL);
+	  
+  // store input filename
+  input_filename = argv[1];
+  // if more than 2 arguments given, third argument is the Switch Register value
+  if (argc > 2) reg_SR = atoi(argv[2]); 
 
-  gtk_widget_show_all(window);
+  // Read in debug flag settings from param.txt.
+  read_param_file(&debug, param_filename);
+
+  // Read in memory from input file.
+  load_memory_array(&mem_array[0], input_filename, debug.mem_display);
   
-  
-  
-  
+  // Display loaded memory in the GUI.
+  display_memory_array(&mem_array[0], vtable_mem);
+
+  //gtk_widget_show_all(window);
+  gtk_widget_show(window);
 
   gtk_main();
 
   return 0;
 }
 
-void execute_instructions() {
+void display_memory_array( s_mem_word* ptr_mem_array, GtkWidget* vtable) {
+	int i;	// loop counter
+	int k; // display index
+	char curr_addr[50]; // address location to write the current data.
+	char curr_data[50]; // current data to be written.
+	
+	// set table headers
+//	GtkWidget* lbl_header_addr = gtk_label_new("\nAddress");
+//	GtkWidget* lbl_header_value = gtk_label_new("Value in Octal\n[Hexadecimal]");
+	
+	// attach column labels to the table
+//	gtk_table_attach_defaults (GTK_TABLE (vtable), lbl_header_addr, 1, 2, 0, 1);
+//	gtk_table_attach_defaults (GTK_TABLE (vtable), lbl_header_value, 2, 3, 0, 1);
+	
+	// start populating table at the 2nd row
+	k = 2;
+	
+	// Resize table initially [rows, cols]
+	gtk_table_resize (GTK_TABLE(vtable),PDP8_MEMSIZE+2,4);
+	
+	// display any lines that are valid
+	for(i = 0; i <= MEM_ARRAY_MAX; i=i+1) {
+		if((ptr_mem_array+i)->valid == 1) {
+			//curr_addr = i;
+			//curr_data = (ptr_mem_array+curr_addr)->value;
+			
+			sprintf(curr_addr, "%04o [%03x]", i, i);
+			sprintf(curr_data, "%04o [%03x]", (ptr_mem_array+i)->value, (ptr_mem_array+i)->value);
+			
+			// attach widgets to the table
+			gtk_table_attach_defaults (GTK_TABLE (vtable), mem_image[k].label_arrow, 0, 1, k, k+1);
+			gtk_table_attach_defaults (GTK_TABLE (vtable), mem_image[k].button_breakpoint, 1, 2, k, k+1);
+			gtk_table_attach_defaults (GTK_TABLE (vtable), mem_image[k].label_addr, 2, 3, k, k+1);
+			gtk_table_attach_defaults (GTK_TABLE (vtable), mem_image[k].label_value, 3, 4, k, k+1);
+
+			// attach "clicked" signal for breakpoint button
+			gtk_signal_connect (GTK_OBJECT (mem_image[k].button_breakpoint), "clicked", GTK_SIGNAL_FUNC (toggle_breakpoint_button_callback), (gpointer) curr_addr);
+			  
+			// show elements:
+			if (reg_PC == i) {
+				// Display arrow for next instruction to be executed
+				gtk_widget_show (mem_image[k].label_arrow);
+			}
+			gtk_widget_show (mem_image[k].button_breakpoint);
+			gtk_widget_show (mem_image[k].label_addr);
+			gtk_widget_show (mem_image[k].label_value);
+			  
+			// to change the label's text after creation:
+			gtk_label_set_text( (GtkLabel*) mem_image[k].label_addr, curr_addr );
+			gtk_label_set_text( (GtkLabel*) mem_image[k].label_value, curr_data );
+			
+			k++; // increment the display index
+		}
+	}
+	
+	// Resize table finally [rows, cols]
+	gtk_table_resize (GTK_TABLE(vtable),k,4);
+}
+
+void execute_instructions(int flag_step) {
 	// - Debug Print Strings:
 	// - Debug Flags:
 	debug.mem_display = 0;
