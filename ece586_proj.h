@@ -231,6 +231,7 @@ void load_memory_array(s_mem_word* ptr_mem_array, char* input_filename, char DEB
 	// all valid bits must be initialized to 0
 	for(i = 0; i <= MEM_ARRAY_MAX; i=i+1) {
 		(ptr_mem_array+i)->valid = 0;
+		(ptr_mem_array+i)->breakpoint = 0;
 	}
 	
 	// Open the input file to read in values to the memory array.

@@ -37,6 +37,7 @@ typedef struct _gtkMemoryLine
 	GtkWidget *label_addr_hex;
 	GtkWidget *label_value_octal;
 	GtkWidget *label_value_hex;
+	GtkWidget *event_box[6]; // event boxes for bg color set
 } gtkMemoryLine;
 
 // struct for label widgets in the listing of registers
@@ -127,6 +128,7 @@ int stat_ui = 0;
 guiInstrVals gui_last_instr; // settings for last instruction executed
 gtkRegisterValues gui_reg_values; // gui labels for the current register values
 GtkWidget *vtable_mem;
+int curr_mem_rows;	// number of memory array rows currently being displayed.
 
 // Function to create an image box
 GtkWidget *create_img_box( char* filename, GtkWidget *image, gchar *label_text)
@@ -174,14 +176,54 @@ void toggle_statusbar(GtkWidget *widget, gpointer statusbar)
 // set/remove breakpoints
 void toggle_breakpoint_button_callback (GtkWidget *widget, gpointer data)
 {
-    if (GTK_TOGGLE_BUTTON (widget)->active) 
-    {
-        /* If control reaches here, the toggle button is down */
-    
-    } else {
-    
-        /* If control reaches here, the toggle button is up */
-    }
+    char buffer[20];	// temp buffer string
+	char str_mem_index[10];
+	char str_disp_index[10];
+	//int oct_addr;	// octal address
+	int addr = 0; // decimal index
+	int disp_i; // display index
+	//int i = 0;	// temp val for calc
+	
+	// get the button label data
+	strncpy(buffer,(char *) gtk_label_get_text((GtkLabel*) data),100);
+	// then parse it to get both the memory index and the display index
+	//str_mem_index = strtok(buffer," ");
+	strncpy(str_mem_index, strtok(buffer," "),9);
+	//str_disp_index = strtok(NULL," ");
+	strncpy(str_disp_index, strtok(NULL," "),9); 
+	addr = atoi(str_mem_index);
+	disp_i = atoi(str_disp_index);
+	fprintf(stderr,"buffer: %s\n",buffer);
+	fprintf(stderr, "addr: %d [%s], disp_i: %d [%s]\n",addr, str_mem_index, disp_i, str_disp_index);
+	
+	/*
+	//oct_addr = atoi(buffer);
+	// convert to decimal
+	while (oct_addr != 0) {
+		addr = addr + (oct_addr % 10) * pow(8,i++);
+		oct_addr = oct_addr / 10;
+	}
+	*/
+	
+	/*
+	// check what the current breakpoint value is, and switch the value
+	if (mem_array[addr].breakpoint)
+	{	// if it was on, turn it off
+		mem_array[addr].breakpoint = FALSE;
+		
+		// change button image as well
+		gtk_image_set_from_file((GtkImage*) mem_image[disp_i].button_image, "img_gtk-clear-rec-22.png");
+		//gtk_widget_queue_draw(mem_image[disp_i].button_image);
+	}
+	else {
+		// else, if it was off, turn it on
+		mem_array[addr].breakpoint = TRUE;
+		
+		// change button image as well
+		gtk_image_set_from_file((GtkImage*) mem_image[disp_i].button_image, "img_gtk-media-rec-22.png");
+		gtk_widget_queue_draw(mem_image[disp_i].button_image);
+	}
+	*/
 }
 
 void gtk_step_clicked(GtkWidget *widget, gpointer data)
@@ -213,7 +255,7 @@ void gtk_start_clicked(GtkWidget *widget, gpointer data)
 
 int main (int argc, char* argv[])
 {
-  int i;
+  int i, j;
   
   // CHECK COMMAND LINE ARGUMENTS:
   if (argc < 2) {
@@ -287,7 +329,8 @@ int main (int argc, char* argv[])
   GtkWidget *hsep1;
   GtkWidget *hsep2;  
   
-  char buffer[1024];
+  //char buffer[1024];
+  curr_mem_rows = 0; // initialized memory array rows currently displayed to be 0
 
   GtkAccelGroup *accel_group = NULL;
 
@@ -580,8 +623,8 @@ int main (int argc, char* argv[])
 	  mem_image[i].button_image = gtk_image_new_from_file("img_gtk-clear-rec-22.png");
 	  // use gtk_image_set_from_file(image) to update
 	  gtk_widget_queue_draw(mem_image[i].button_image);
-	  // initialize invisible label to 0 (FALSE)
-	  mem_image[i].button_label = gtk_label_new("0");
+	  // initialize invisible label
+	  mem_image[i].button_label = gtk_label_new("");
 
 	  mem_image[i].label_arrow = gtk_image_new_from_stock(GTK_STOCK_GO_FORWARD, GTK_ICON_SIZE_SMALL_TOOLBAR);
 	  //mem_image[i].button_breakpoint = gtk_toggle_button_new();
@@ -590,10 +633,26 @@ int main (int argc, char* argv[])
 	  //mem_image[i].label_addr = gtk_label_new("");
 	  //mem_image[i].label_value = gtk_label_new("");
 	  mem_image[i].label_addr_octal = gtk_label_new("");
-	  mem_image[i].label_value_octal = gtk_label_new("");
 	  mem_image[i].label_addr_hex = gtk_label_new("");
+	  mem_image[i].label_value_octal = gtk_label_new("");
 	  mem_image[i].label_value_hex = gtk_label_new("");
 	  
+	  for (j = 0; j < 6; j++) {
+		  mem_image[i].event_box[j] = gtk_event_box_new();
+	  }
+	  
+	  gtk_container_add( GTK_CONTAINER(mem_image[i].event_box[0]), mem_image[i].label_arrow);
+	  gtk_container_add( GTK_CONTAINER(mem_image[i].event_box[1]), mem_image[i].button_breakpoint);
+	  gtk_container_add( GTK_CONTAINER(mem_image[i].event_box[2]), mem_image[i].label_addr_octal);
+	  gtk_container_add( GTK_CONTAINER(mem_image[i].event_box[3]), mem_image[i].label_addr_hex);
+	  gtk_container_add( GTK_CONTAINER(mem_image[i].event_box[4]), mem_image[i].label_value_octal);
+	  gtk_container_add( GTK_CONTAINER(mem_image[i].event_box[5]), mem_image[i].label_value_hex);
+
+	  // attach "clicked" signal for breakpoint button
+	  gtk_signal_connect (GTK_OBJECT (mem_image[i].button_breakpoint), "clicked", GTK_SIGNAL_FUNC (toggle_breakpoint_button_callback), (gpointer) mem_image[i].button_label);
+	  //gtk_signal_connect (GTK_OBJECT (button), "clicked", GTK_SIGNAL_FUNC (toggle_breakpoint_button_callback), (gpointer) "memory_index");
+	  	  
+	  /*
 	  // attach widgets to the table
 	  gtk_table_attach_defaults (GTK_TABLE (vtable_mem), mem_image[i].label_arrow, 0, 1, i, i+1);
 	  gtk_table_attach_defaults (GTK_TABLE (vtable_mem), mem_image[i].button_breakpoint, 1, 2, i, i+1);
@@ -603,10 +662,7 @@ int main (int argc, char* argv[])
 	  gtk_table_attach_defaults (GTK_TABLE (vtable_mem), mem_image[i].label_addr_hex, 3, 4, i, i+1);
 	  gtk_table_attach_defaults (GTK_TABLE (vtable_mem), mem_image[i].label_value_octal, 4, 5, i, i+1);
 	  gtk_table_attach_defaults (GTK_TABLE (vtable_mem), mem_image[i].label_value_hex, 5, 6, i, i+1);
-
-	  // attach "clicked" signal for breakpoint button
-	  gtk_signal_connect (GTK_OBJECT (mem_image[i].button_breakpoint), "clicked", GTK_SIGNAL_FUNC (toggle_breakpoint_button_callback), (gpointer) mem_image[i].button_label);
-	  //gtk_signal_connect (GTK_OBJECT (button), "clicked", GTK_SIGNAL_FUNC (toggle_breakpoint_button_callback), (gpointer) "memory_index");
+	  */
 	  
 	  // show elements:
 	  //gtk_widget_show (mem_image[i].label_arrow);
@@ -618,6 +674,23 @@ int main (int argc, char* argv[])
 	  //gtk_label_set_text( (GtkLabel) mem_image[i].label_addr, str_address );
 	  //gtk_label_set_text( (GtkLabel) mem_image[i].label_value, str_value );
   }
+  
+  // attach only the first row of the memory array
+  // attach widgets to the table
+  /*
+  for (j = 0; j < 6; j++) {
+	  gtk_table_attach_defaults (GTK_TABLE (vtable_mem), mem_image[0].event_box[j], j, j+1, 3, 4);
+  }
+  */
+  
+  /*
+  gtk_table_attach_defaults (GTK_TABLE (vtable_mem), mem_image[0].label_arrow, 0, 1, 0, 1);
+  gtk_table_attach_defaults (GTK_TABLE (vtable_mem), mem_image[0].button_breakpoint, 1, 2, 0, 1);
+  gtk_table_attach_defaults (GTK_TABLE (vtable_mem), mem_image[0].label_addr_octal, 2, 3, 0, 1);
+  gtk_table_attach_defaults (GTK_TABLE (vtable_mem), mem_image[0].label_addr_hex, 3, 4, 0, 1);
+  gtk_table_attach_defaults (GTK_TABLE (vtable_mem), mem_image[0].label_value_octal, 4, 5, 0, 1);
+  gtk_table_attach_defaults (GTK_TABLE (vtable_mem), mem_image[0].label_value_hex, 5, 6, 0, 1);
+  */
   
   // Resize table afterwards [rows, cols]
   gtk_table_resize (GTK_TABLE(vtable_mem),4,4);
@@ -692,12 +765,14 @@ void display_reg_values()
 }
 
 void display_memory_array( s_mem_word* ptr_mem_array, GtkWidget* vtable) {
-	int i;	// loop counter
-	int k; // display index
+	int i;	// mem_array index
+	int j; // event box index
+	int k; // display index for gui table
 	char curr_addr_octal[10]; // address location in octal
 	char curr_addr_hex[10]; // address location in hex.
 	char curr_data_octal[10]; // current data in octal.
 	char curr_data_hex[10];	// current data in hex.
+	char str_data [20];	// data to store in the label
 	
 	// set table headers
 //	GtkWidget* lbl_header_addr = gtk_label_new("\nAddress");
@@ -726,43 +801,71 @@ void display_memory_array( s_mem_word* ptr_mem_array, GtkWidget* vtable) {
 			sprintf(curr_addr_hex,"%03x", i);
 			sprintf(curr_data_octal, "%04o", (ptr_mem_array+i)->value);
 			sprintf(curr_data_hex, "%03x", (ptr_mem_array+i)->value);
+			// for the data label, store the memory array index, and then the display table index.
+			sprintf(str_data, "%d %d ", i, k);
 			
-			/*
-			// attach widgets to the table
-			gtk_table_attach_defaults (GTK_TABLE (vtable), mem_image[k].label_arrow, 0, 1, k, k+1);
-			gtk_table_attach_defaults (GTK_TABLE (vtable), mem_image[k].button_breakpoint, 1, 2, k, k+1);
-			//gtk_table_attach_defaults (GTK_TABLE (vtable), mem_image[k].label_addr, 2, 3, k, k+1);
-			//gtk_table_attach_defaults (GTK_TABLE (vtable), mem_image[k].label_value, 3, 4, k, k+1);
-			gtk_table_attach_defaults (GTK_TABLE (vtable), mem_image[k].label_addr_octal, 2, 3, k, k+1);
-			gtk_table_attach_defaults (GTK_TABLE (vtable), mem_image[k].label_addr_hex, 3, 4, k, k+1);
-			gtk_table_attach_defaults (GTK_TABLE (vtable), mem_image[k].label_value_octal, 4, 5, k, k+1);
-			gtk_table_attach_defaults (GTK_TABLE (vtable), mem_image[k].label_value_hex, 5, 6, k, k+1);
-			*/
-
-			// attach "clicked" signal for breakpoint button
-			gtk_signal_connect (GTK_OBJECT (mem_image[k].button_breakpoint), "clicked", GTK_SIGNAL_FUNC (toggle_breakpoint_button_callback), (gpointer) curr_addr_octal);
+			// attach widgets to the table - ONLY DO ONCE, if not already attached
+			if (k > curr_mem_rows+2)
+			{
+				/*
+				gtk_table_attach_defaults (GTK_TABLE (vtable), mem_image[k].label_arrow, 0, 1, k, k+1);
+				gtk_table_attach_defaults (GTK_TABLE (vtable), mem_image[k].button_breakpoint, 1, 2, k, k+1);
+				//gtk_table_attach_defaults (GTK_TABLE (vtable), mem_image[k].label_addr, 2, 3, k, k+1);
+				//gtk_table_attach_defaults (GTK_TABLE (vtable), mem_image[k].label_value, 3, 4, k, k+1);
+				gtk_table_attach_defaults (GTK_TABLE (vtable), mem_image[k].label_addr_octal, 2, 3, k, k+1);
+				gtk_table_attach_defaults (GTK_TABLE (vtable), mem_image[k].label_addr_hex, 3, 4, k, k+1);
+				gtk_table_attach_defaults (GTK_TABLE (vtable), mem_image[k].label_value_octal, 4, 5, k, k+1);
+				gtk_table_attach_defaults (GTK_TABLE (vtable), mem_image[k].label_value_hex, 5, 6, k, k+1);
+				*/
+				for (j = 0; j < 6; j++) {
+					gtk_table_attach_defaults (GTK_TABLE (vtable), mem_image[k].event_box[j], j, j+1, k, k+1);
+				}
+				curr_mem_rows++;
+			}
+						  
+			// to change the label's text after creation:
+			//gtk_label_set_text( (GtkLabel*) mem_image[k].label_addr, curr_addr );
+			//gtk_label_set_text( (GtkLabel*) mem_image[k].label_value, curr_data );
+			gtk_label_set_text( (GtkLabel*) mem_image[k].label_addr_octal, curr_addr_octal );
+			gtk_label_set_text( (GtkLabel*) mem_image[k].label_addr_hex, curr_addr_hex );
+			gtk_label_set_text( (GtkLabel*) mem_image[k].label_value_octal, curr_data_octal );
+			gtk_label_set_text( (GtkLabel*) mem_image[k].label_value_hex, curr_data_hex );
+			gtk_label_set_text( (GtkLabel*) mem_image[k].button_label, str_data);
 			  
 			// show elements:
 			if (reg_PC == i) {
 				// Display arrow for next instruction to be executed
 				gtk_widget_show (mem_image[k].label_arrow);
 			}
+			else {
+				gtk_widget_hide (mem_image[k].label_arrow);
+			}
 			gtk_widget_show (mem_image[k].button_breakpoint);
 			gtk_widget_show (mem_image[k].button_image);
 			//gtk_widget_show (mem_image[k].label_addr);
 			//gtk_widget_show (mem_image[k].label_value);
 			gtk_widget_show (mem_image[k].label_addr_octal);
-			gtk_widget_show (mem_image[k].label_value_octal);
 			gtk_widget_show (mem_image[k].label_addr_hex);
+			gtk_widget_show (mem_image[k].label_value_octal);
 			gtk_widget_show (mem_image[k].label_value_hex);
-			  
-			// to change the label's text after creation:
-			//gtk_label_set_text( (GtkLabel*) mem_image[k].label_addr, curr_addr );
-			//gtk_label_set_text( (GtkLabel*) mem_image[k].label_value, curr_data );
-			gtk_label_set_text( (GtkLabel*) mem_image[k].label_addr_octal, curr_addr_octal );
-			gtk_label_set_text( (GtkLabel*) mem_image[k].label_value_octal, curr_data_octal );
-			gtk_label_set_text( (GtkLabel*) mem_image[k].label_addr_hex, curr_addr_hex );
-			gtk_label_set_text( (GtkLabel*) mem_image[k].label_value_hex, curr_data_hex );
+			
+			// set the button image depending on the value of the 
+			// breakpoint flag
+			if ((ptr_mem_array+i)->breakpoint) {
+				gtk_image_set_from_file((GtkImage*) mem_image[k].button_image, "img_gtk-media-rec-22.png");
+				gtk_widget_queue_draw(mem_image[k].button_image);
+			}
+			else {
+				gtk_image_set_from_file((GtkImage*) mem_image[k].button_image, "img_gtk-clear-rec-22.png");
+				gtk_widget_queue_draw(mem_image[k].button_image);
+			}
+			
+			for (j = 0; j < 6; j++) {
+				gtk_widget_show (mem_image[k].event_box[j]);
+			}
+			
+			// set color background of all elements in this row
+			
 			
 			k++; // increment the display index
 		}
