@@ -24,14 +24,13 @@
 // END PARAMETER SECTION
 //=========================================================
 
-void execute_instructions();
-void display_memory_array( s_mem_word* ptr_mem_array, GtkWidget* vtable);
-
 // struct for widgets included for a single line in the memory image
 typedef struct _gtkMemoryLine
 {
     GtkWidget *label_arrow;
 	GtkWidget *button_breakpoint;
+	GtkWidget *button_image;
+	GtkWidget *button_label;
 	//GtkWidget *label_addr;
 	//GtkWidget *label_value;
 	GtkWidget *label_addr_octal;
@@ -45,9 +44,12 @@ typedef struct _gtkRegisterValues
 {
 	GtkWidget *label_last_PC_hex;
 	GtkWidget *label_last_PC_octal;
+	GtkWidget *label_opcode;
 	GtkWidget *label_last_IR_hex;
 	GtkWidget *label_last_IR_octal;
 	GtkWidget *label_last_IR_binary;
+	GtkWidget *label_next_PC_hex;
+	GtkWidget *label_next_PC_octal;
 	GtkWidget *label_LR;
 	GtkWidget *label_AC_hex;
 	GtkWidget *label_AC_octal;
@@ -55,28 +57,13 @@ typedef struct _gtkRegisterValues
 	GtkWidget *label_SR_octal;
 } gtkRegisterValues;
 
-// hide and display the status bar
-void toggle_statusbar(GtkWidget *widget, gpointer statusbar) 
-{
-  if (gtk_check_menu_item_get_active(GTK_CHECK_MENU_ITEM(widget))) {
-    gtk_widget_show(statusbar);
-  } else {
-    gtk_widget_hide(statusbar);
-  }
-}
-
-// set/remove breakpoints
-void toggle_breakpoint_button_callback (GtkWidget *widget, gpointer data)
-{
-    if (GTK_TOGGLE_BUTTON (widget)->active) 
-    {
-        /* If control reaches here, the toggle button is down */
-    
-    } else {
-    
-        /* If control reaches here, the toggle button is up */
-    }
-}
+// Function Prototypes
+void init();
+void init_debug_strings();
+void execute_instructions();
+void display_memory_array( s_mem_word* ptr_mem_array, GtkWidget* vtable);
+//void display_reg_values( gtkRegisterValues* gui_curr_reg, guiInstrVals* gui_last_instr);
+void display_reg_values();
 
 /* GLOBAL VARIABLES */
 // NOTE: Given more time, these should be moved into main() or other
@@ -135,6 +122,94 @@ int stat_jms = 0;
 int stat_jmp = 0;
 int stat_io = 0;
 int stat_ui = 0;
+// Global GUI Variables
+// - GUI
+guiInstrVals gui_last_instr; // settings for last instruction executed
+gtkRegisterValues gui_reg_values; // gui labels for the current register values
+GtkWidget *vtable_mem;
+
+// Function to create an image box
+GtkWidget *create_img_box( char* filename, GtkWidget *image, gchar *label_text)
+{
+    GtkWidget *box1;
+    GtkWidget *label;
+    //GtkImage *image;
+
+    /* Create box for image and label */
+    box1 = gtk_hbox_new (FALSE, 0);
+    gtk_container_set_border_width (GTK_CONTAINER (box1), 2);
+
+    image = gtk_image_new_from_file(filename);
+	// use gtk_image_set_from_file(image) to update
+
+    gtk_widget_queue_draw(image);
+	
+	// Label to be used as a hidden flag.
+    label = gtk_label_new (label_text);
+
+    /* Pack the pixmap and label into the box */
+    gtk_box_pack_start (GTK_BOX (box1),
+                        image, FALSE, FALSE, 3);
+
+    gtk_box_pack_start (GTK_BOX (box1), label, FALSE, FALSE, 3);
+
+    gtk_widget_show(image);
+	
+	// Note, do NOT display the label.  Try to use it as a toggle flag.
+
+    return(box1);
+}
+
+// Toolbar action functions
+// hide and display the status bar
+void toggle_statusbar(GtkWidget *widget, gpointer statusbar) 
+{
+  if (gtk_check_menu_item_get_active(GTK_CHECK_MENU_ITEM(widget))) {
+    gtk_widget_show(statusbar);
+  } else {
+    gtk_widget_hide(statusbar);
+  }
+}
+
+// set/remove breakpoints
+void toggle_breakpoint_button_callback (GtkWidget *widget, gpointer data)
+{
+    if (GTK_TOGGLE_BUTTON (widget)->active) 
+    {
+        /* If control reaches here, the toggle button is down */
+    
+    } else {
+    
+        /* If control reaches here, the toggle button is up */
+    }
+}
+
+void gtk_step_clicked(GtkWidget *widget, gpointer data)
+{
+	// execute the instructions; pass value of true to indicate
+	// that only one instruction should be executed.
+	execute_instructions(TRUE);
+
+	// display the current register values
+	display_reg_values(&gui_reg_values, &gui_last_instr);
+	
+	// Display loaded memory in the GUI.
+	display_memory_array(&mem_array[0], vtable_mem);
+}
+
+void gtk_start_clicked(GtkWidget *widget, gpointer data)
+{
+	// execute the instructions; pass value of false to indicate
+	// that instructions should continue to be executed.
+	execute_instructions(FALSE);
+	
+	// display the current register values
+	display_reg_values(&gui_reg_values, &gui_last_instr);
+	
+	// Display loaded memory in the GUI.
+	display_memory_array(&mem_array[0], vtable_mem);
+}
+
 
 int main (int argc, char* argv[])
 {
@@ -160,11 +235,14 @@ int main (int argc, char* argv[])
   GtkWidget *lbl_vtable_mem_header_hex1;
   GtkWidget *lbl_vtable_mem_header_octal2;
   GtkWidget *lbl_vtable_mem_header_hex2;
-  GtkWidget *vtable_mem;
   GtkWidget *vbox;
-  GtkWidget *vbox2;
+  GtkWidget *hbox_main;
+  //GtkWidget *vbox2;
   GtkWidget *vbox3;
   GtkWidget *vbox4;
+  
+  // IMAGE ICON ITEMS
+  GtkWidget *image_box;
 
   // MENU ITEMS
   GtkWidget *menubar;
@@ -188,6 +266,26 @@ int main (int argc, char* argv[])
   GtkToolItem *toolitemsep;
   GtkToolItem *toolitem_start;
   GtkToolItem *toolitem_step;
+  
+  // CURRENT REGISTER VALUES
+  GtkWidget *vbox2a;
+  GtkWidget *lbl_last_PC;
+  GtkWidget *lbl_opcode;
+  GtkWidget *lbl_last_IR;
+  GtkWidget *lbl_PC;
+  GtkWidget *lbl_LR;
+  GtkWidget *lbl_AC;
+  GtkWidget *lbl_SR;
+  GtkWidget *hbox1;
+  GtkWidget *hbox2;
+  GtkWidget *hbox2a;
+  GtkWidget *hbox3;
+  GtkWidget *hbox4;
+  GtkWidget *hbox5;
+  GtkWidget *hbox6;
+  GtkWidget *hbox7;
+  GtkWidget *hsep1;
+  GtkWidget *hsep2;  
   
   char buffer[1024];
 
@@ -266,25 +364,135 @@ int main (int argc, char* argv[])
   //gtk_widget_show(vbox);
   
   // create vbox2 to contain updated contents on execution of the simulator
-  vbox2 = gtk_vbox_new(FALSE, 0);
+  hbox_main = gtk_hbox_new(FALSE, 0);
   // recall that parameters 3 - 5 are for: expand, fill, padding.
-  gtk_box_pack_start(GTK_BOX(vbox), vbox2, TRUE, TRUE, 0);
-  gtk_widget_show(vbox2);
+  gtk_box_pack_start(GTK_BOX(vbox), hbox_main, FALSE, FALSE, 0);
+  gtk_widget_show(hbox_main);
+
+  vbox2a = gtk_vbox_new(FALSE, 0);
+  gtk_box_pack_start(GTK_BOX(hbox_main),vbox2a, FALSE, FALSE, 5);
+  gtk_widget_show(vbox2a);
+  
+  // PC of last executed instruction:
+  hbox1 = gtk_hbox_new(FALSE, 0);
+  lbl_last_PC = gtk_label_new("PC of Last Executed Instruction: ");
+  gui_reg_values.label_last_PC_octal = gtk_label_new("");
+  gui_reg_values.label_last_PC_hex = gtk_label_new("");
+  gtk_box_pack_start(GTK_BOX(hbox1), lbl_last_PC, FALSE, FALSE, 5);
+  gtk_box_pack_start(GTK_BOX(hbox1), gui_reg_values.label_last_PC_octal, FALSE, FALSE, 5);
+  gtk_box_pack_end(GTK_BOX(hbox1), gui_reg_values.label_last_PC_hex, FALSE, FALSE, 5);
+  gtk_widget_show(hbox1);
+  gtk_widget_show(lbl_last_PC);
+  gtk_widget_show(gui_reg_values.label_last_PC_octal);
+  gtk_widget_show(gui_reg_values.label_last_PC_hex);
+  gtk_box_pack_start(GTK_BOX(vbox2a), hbox1, TRUE, TRUE, 3);
+  
+  // Instruction Opcode:
+  hbox2a = gtk_hbox_new(FALSE, 0);
+  lbl_opcode = gtk_label_new("Instruction Opcode: ");
+  gui_reg_values.label_opcode = gtk_label_new("");
+  gtk_box_pack_start(GTK_BOX(hbox2a), lbl_opcode, FALSE, FALSE, 5);
+  gtk_box_pack_end(GTK_BOX(hbox2a), gui_reg_values.label_opcode, FALSE, FALSE, 5);
+  gtk_widget_show(hbox2a);
+  gtk_widget_show(lbl_opcode);
+  gtk_widget_show(gui_reg_values.label_opcode);
+  gtk_box_pack_start(GTK_BOX(vbox2a), hbox2a, TRUE, TRUE, 3);
+  
+  // IR of last executed instruction:
+  hbox2 = gtk_hbox_new(FALSE, 0);
+  lbl_last_IR = gtk_label_new("IR of Last Executed Instruction: ");
+  gui_reg_values.label_last_IR_octal = gtk_label_new("");
+  gui_reg_values.label_last_IR_hex = gtk_label_new("");
+  gui_reg_values.label_last_IR_binary = gtk_label_new("");
+  gtk_box_pack_start(GTK_BOX(hbox2), lbl_last_IR, FALSE, FALSE, 5);
+  gtk_box_pack_start(GTK_BOX(hbox2), gui_reg_values.label_last_IR_octal, FALSE, FALSE, 5);
+  gtk_box_pack_end(GTK_BOX(hbox2), gui_reg_values.label_last_IR_hex, FALSE, FALSE, 5);
+  hbox3 = gtk_hbox_new(FALSE, 0);
+  gtk_box_pack_start(GTK_BOX(hbox3), gui_reg_values.label_last_IR_binary, FALSE, FALSE, 5);
+  gtk_widget_show(hbox2);
+  gtk_widget_show(lbl_last_IR);
+  gtk_widget_show(gui_reg_values.label_last_IR_octal);
+  gtk_widget_show(gui_reg_values.label_last_IR_hex);
+  gtk_widget_show(hbox3);
+  gtk_widget_show(gui_reg_values.label_last_IR_binary);
+  gtk_box_pack_start(GTK_BOX(vbox2a), hbox2, TRUE, TRUE, 3);
+  gtk_box_pack_start(GTK_BOX(vbox2a), hbox3, TRUE, TRUE, 3);
+  
+  // separator
+  hsep1 = gtk_hseparator_new ();
+  gtk_widget_show(hsep1);
+  gtk_box_pack_start(GTK_BOX(vbox2a), hsep1, TRUE, TRUE, 3);
+  
+  // next Program Counter:
+  hbox4 = gtk_hbox_new(FALSE, 0);
+  lbl_PC = gtk_label_new("Program Counter (PC): ");
+  gui_reg_values.label_next_PC_octal = gtk_label_new("");
+  gui_reg_values.label_next_PC_hex = gtk_label_new("");
+  gtk_box_pack_start(GTK_BOX(hbox4), lbl_PC, FALSE, FALSE, 5);
+  gtk_box_pack_start(GTK_BOX(hbox4), gui_reg_values.label_next_PC_octal, FALSE, FALSE, 5);
+  gtk_box_pack_end(GTK_BOX(hbox4), gui_reg_values.label_next_PC_hex, FALSE, FALSE, 5);
+  gtk_widget_show(lbl_PC);
+  gtk_widget_show(gui_reg_values.label_next_PC_octal);
+  gtk_widget_show(gui_reg_values.label_next_PC_hex);
+  gtk_widget_show(hbox4);
+  gtk_box_pack_start(GTK_BOX(vbox2a), hbox4, TRUE, TRUE, 3);
+  
+  // Link Register:
+  hbox5 = gtk_hbox_new(FALSE, 0);
+  lbl_LR = gtk_label_new("Link Register (LR): ");
+  gui_reg_values.label_LR = gtk_label_new("");
+  gtk_box_pack_start(GTK_BOX(hbox5), lbl_LR, FALSE, FALSE, 5);
+  gtk_box_pack_start(GTK_BOX(hbox5), gui_reg_values.label_LR, FALSE, FALSE, 5);
+  gtk_widget_show(lbl_LR);
+  gtk_widget_show(gui_reg_values.label_LR);
+  gtk_widget_show(hbox5);
+  gtk_box_pack_start(GTK_BOX(vbox2a), hbox5, TRUE, TRUE, 3);
+  
+  // Accumulator:
+  hbox6 = gtk_hbox_new(FALSE, 0);
+  lbl_AC = gtk_label_new("Accumulator (AC): ");
+  gui_reg_values.label_AC_octal = gtk_label_new("");
+  gui_reg_values.label_AC_hex = gtk_label_new("");
+  gtk_box_pack_start(GTK_BOX(hbox6), lbl_AC, FALSE, FALSE, 5);
+  gtk_box_pack_start(GTK_BOX(hbox6), gui_reg_values.label_AC_octal, FALSE, FALSE, 5);
+  gtk_box_pack_end(GTK_BOX(hbox6), gui_reg_values.label_AC_hex, FALSE, FALSE, 5);
+  gtk_widget_show(lbl_AC);
+  gtk_widget_show(gui_reg_values.label_AC_octal);
+  gtk_widget_show(gui_reg_values.label_AC_hex);
+  gtk_widget_show(hbox6);
+  gtk_box_pack_start(GTK_BOX(vbox2a), hbox6, TRUE, TRUE, 3);
+  
+  // Switch Register:
+  hbox7 = gtk_hbox_new(FALSE, 0);
+  lbl_SR = gtk_label_new("Switch Register (SR): ");
+  gui_reg_values.label_SR_octal = gtk_label_new("");
+  gui_reg_values.label_SR_hex = gtk_label_new("");
+  gtk_box_pack_start(GTK_BOX(hbox7), lbl_SR, FALSE, FALSE, 5);
+  gtk_box_pack_start(GTK_BOX(hbox7), gui_reg_values.label_SR_octal, FALSE, FALSE, 5);
+  gtk_box_pack_end(GTK_BOX(hbox7), gui_reg_values.label_SR_hex, FALSE, FALSE, 5);
+  gtk_widget_show(lbl_SR);
+  gtk_widget_show(gui_reg_values.label_SR_octal);
+  gtk_widget_show(gui_reg_values.label_SR_hex);
+  gtk_widget_show(hbox7);
+  gtk_box_pack_start(GTK_BOX(vbox2a), hbox7, TRUE, TRUE, 3);
   
   // create vtable1 to contain the register values on the left hand side and 
   // the memory table (scrolled window) on the right hand side.
+  /*
   vtable1 = gtk_table_new(4, 4, TRUE);
   gtk_table_set_row_spacings(GTK_TABLE(vtable1), 2);
   gtk_table_set_col_spacings(GTK_TABLE(vtable1), 2);
-  gtk_box_pack_start(GTK_BOX(vbox2), vtable1, TRUE, TRUE, 1);
+  gtk_box_pack_start(GTK_BOX(hbox_main), vtable1, TRUE, TRUE, 1);
   gtk_widget_show(vtable1);
+  */
   
   // create vbox3 to contain the memory section
   vbox3 = gtk_vbox_new(FALSE, 0);
   // recall that parameters 3 - 5 are for: expand, fill, padding.
   //gtk_box_pack_start(GTK_BOX(vbox), vbox2, FALSE, TRUE, 1);
   // (left col, right col, top row, bottom row, xoptions, yoptions, xpadding, ypadding)
-  gtk_table_attach(GTK_TABLE(vtable1),vbox3, 2, 4, 0, 4, 0, 0, 2, 2);
+  //gtk_table_attach(GTK_TABLE(vtable1),vbox3, 2, 4, 0, 4, 0, 0, 2, 2);
+  gtk_box_pack_start(GTK_BOX(hbox_main),vbox3, TRUE, TRUE, 1);
   gtk_widget_show(vbox3);
   
   /* MEMORY DATA FRAME */
@@ -366,9 +574,19 @@ int main (int argc, char* argv[])
   for (i = 0; i < PDP8_MEMSIZE; i++)
   {
 	  //sprintf (buffer, "cell (%d,%d)\n", i, j);
+	  
+	  // create image box with the default clear button
+	  //image_box = create_img_box("img_gtk-clear-rec-22.png", mem_image[i].button_image, "0");
+	  mem_image[i].button_image = gtk_image_new_from_file("img_gtk-clear-rec-22.png");
+	  // use gtk_image_set_from_file(image) to update
+	  gtk_widget_queue_draw(mem_image[i].button_image);
+	  // initialize invisible label to 0 (FALSE)
+	  mem_image[i].button_label = gtk_label_new("0");
 
 	  mem_image[i].label_arrow = gtk_image_new_from_stock(GTK_STOCK_GO_FORWARD, GTK_ICON_SIZE_SMALL_TOOLBAR);
-	  mem_image[i].button_breakpoint = gtk_toggle_button_new();
+	  //mem_image[i].button_breakpoint = gtk_toggle_button_new();
+	  mem_image[i].button_breakpoint = gtk_button_new();
+	  gtk_container_add (GTK_CONTAINER(mem_image[i].button_breakpoint), mem_image[i].button_image);
 	  //mem_image[i].label_addr = gtk_label_new("");
 	  //mem_image[i].label_value = gtk_label_new("");
 	  mem_image[i].label_addr_octal = gtk_label_new("");
@@ -377,12 +595,17 @@ int main (int argc, char* argv[])
 	  mem_image[i].label_value_hex = gtk_label_new("");
 	  
 	  // attach widgets to the table
-	//  gtk_table_attach_defaults (GTK_TABLE (vtable_mem), mem_image[i].label_arrow, 0, 1, i, i+1);
-	//  gtk_table_attach_defaults (GTK_TABLE (vtable_mem), mem_image[i].button_breakpoint, 1, 2, i, i+1);
-	//  gtk_table_attach_defaults (GTK_TABLE (vtable_mem), mem_image[i].label_addr, 2, 3, i, i+1);
-	//  gtk_table_attach_defaults (GTK_TABLE (vtable_mem), mem_image[i].label_value, 3, 4, i, i+1);
+	  gtk_table_attach_defaults (GTK_TABLE (vtable_mem), mem_image[i].label_arrow, 0, 1, i, i+1);
+	  gtk_table_attach_defaults (GTK_TABLE (vtable_mem), mem_image[i].button_breakpoint, 1, 2, i, i+1);
+	  //gtk_table_attach_defaults (GTK_TABLE (vtable_mem), mem_image[i].label_addr, 2, 3, i, i+1);
+	  //gtk_table_attach_defaults (GTK_TABLE (vtable_mem), mem_image[i].label_value, 3, 4, i, i+1);
+	  gtk_table_attach_defaults (GTK_TABLE (vtable_mem), mem_image[i].label_addr_octal, 2, 3, i, i+1);
+	  gtk_table_attach_defaults (GTK_TABLE (vtable_mem), mem_image[i].label_addr_hex, 3, 4, i, i+1);
+	  gtk_table_attach_defaults (GTK_TABLE (vtable_mem), mem_image[i].label_value_octal, 4, 5, i, i+1);
+	  gtk_table_attach_defaults (GTK_TABLE (vtable_mem), mem_image[i].label_value_hex, 5, 6, i, i+1);
 
 	  // attach "clicked" signal for breakpoint button
+	  gtk_signal_connect (GTK_OBJECT (mem_image[i].button_breakpoint), "clicked", GTK_SIGNAL_FUNC (toggle_breakpoint_button_callback), (gpointer) mem_image[i].button_label);
 	  //gtk_signal_connect (GTK_OBJECT (button), "clicked", GTK_SIGNAL_FUNC (toggle_breakpoint_button_callback), (gpointer) "memory_index");
 	  
 	  // show elements:
@@ -405,14 +628,11 @@ int main (int argc, char* argv[])
 
   
   /* SIGNAL CONNECTS */
-  
-  g_signal_connect_swapped(G_OBJECT(window), "destroy",
-      G_CALLBACK(gtk_main_quit), NULL);
-
+  g_signal_connect_swapped(G_OBJECT(window), "destroy", G_CALLBACK(gtk_main_quit), NULL);
   g_signal_connect(G_OBJECT(tog_status), "activate", G_CALLBACK(toggle_statusbar), statusbar);
-
-  g_signal_connect(G_OBJECT(quit), "activate",
-      G_CALLBACK(gtk_main_quit), NULL);
+  g_signal_connect(G_OBJECT(quit), "activate", G_CALLBACK(gtk_main_quit), NULL);
+  g_signal_connect(G_OBJECT(toolitem_step), "clicked", GTK_SIGNAL_FUNC(gtk_step_clicked), NULL);
+  g_signal_connect(G_OBJECT(toolitem_start), "clicked", GTK_SIGNAL_FUNC(gtk_start_clicked), NULL);
 	  
   // store input filename
   input_filename = argv[1];
@@ -434,6 +654,41 @@ int main (int argc, char* argv[])
   gtk_main();
 
   return 0;
+}
+
+//void display_reg_values( gtkRegisterValues* gui_curr_reg, guiInstrVals* gui_last_instr )
+void display_reg_values()
+{
+	char buffer[512];
+	
+	// Set all label values
+	// - Last PC
+	sprintf(buffer,"%04o",gui_last_instr.last_PC);
+	gtk_label_set_text( (GtkLabel*) gui_reg_values.label_last_PC_octal, buffer );
+	sprintf(buffer,"%03x",gui_last_instr.last_PC);
+	gtk_label_set_text( (GtkLabel*) gui_reg_values.label_last_PC_hex, buffer );
+	// - Last Opcode
+	gtk_label_set_text( (GtkLabel*) gui_reg_values.label_opcode, gui_last_instr.str_opcode );
+	// - Last IR
+	sprintf(buffer,"%04o",reg_IR);
+	gtk_label_set_text( (GtkLabel*) gui_reg_values.label_last_IR_octal, buffer );
+	sprintf(buffer,"%03x",reg_IR);
+	gtk_label_set_text( (GtkLabel*) gui_reg_values.label_last_IR_hex, buffer );
+	gtk_label_set_text( (GtkLabel*) gui_reg_values.label_last_IR_binary, gui_last_instr.IR_detail );
+	// - Next PC
+	sprintf(buffer,"%04o",reg_PC);
+	gtk_label_set_text( (GtkLabel*) gui_reg_values.label_next_PC_octal, buffer );
+	sprintf(buffer,"%03x",reg_PC);
+	gtk_label_set_text( (GtkLabel*) gui_reg_values.label_next_PC_hex, buffer );
+	// - AC
+	sprintf(buffer,"%04o",reg_AC);
+	gtk_label_set_text( (GtkLabel*) gui_reg_values.label_AC_octal, buffer );
+	sprintf(buffer,"%03x",reg_AC);
+	gtk_label_set_text( (GtkLabel*) gui_reg_values.label_AC_hex, buffer );
+	// - LR
+	sprintf(buffer,"%o",reg_LR);
+	gtk_label_set_text( (GtkLabel*) gui_reg_values.label_LR, buffer );
+	
 }
 
 void display_memory_array( s_mem_word* ptr_mem_array, GtkWidget* vtable) {
@@ -472,6 +727,7 @@ void display_memory_array( s_mem_word* ptr_mem_array, GtkWidget* vtable) {
 			sprintf(curr_data_octal, "%04o", (ptr_mem_array+i)->value);
 			sprintf(curr_data_hex, "%03x", (ptr_mem_array+i)->value);
 			
+			/*
 			// attach widgets to the table
 			gtk_table_attach_defaults (GTK_TABLE (vtable), mem_image[k].label_arrow, 0, 1, k, k+1);
 			gtk_table_attach_defaults (GTK_TABLE (vtable), mem_image[k].button_breakpoint, 1, 2, k, k+1);
@@ -481,6 +737,7 @@ void display_memory_array( s_mem_word* ptr_mem_array, GtkWidget* vtable) {
 			gtk_table_attach_defaults (GTK_TABLE (vtable), mem_image[k].label_addr_hex, 3, 4, k, k+1);
 			gtk_table_attach_defaults (GTK_TABLE (vtable), mem_image[k].label_value_octal, 4, 5, k, k+1);
 			gtk_table_attach_defaults (GTK_TABLE (vtable), mem_image[k].label_value_hex, 5, 6, k, k+1);
+			*/
 
 			// attach "clicked" signal for breakpoint button
 			gtk_signal_connect (GTK_OBJECT (mem_image[k].button_breakpoint), "clicked", GTK_SIGNAL_FUNC (toggle_breakpoint_button_callback), (gpointer) curr_addr_octal);
@@ -491,6 +748,7 @@ void display_memory_array( s_mem_word* ptr_mem_array, GtkWidget* vtable) {
 				gtk_widget_show (mem_image[k].label_arrow);
 			}
 			gtk_widget_show (mem_image[k].button_breakpoint);
+			gtk_widget_show (mem_image[k].button_image);
 			//gtk_widget_show (mem_image[k].label_addr);
 			//gtk_widget_show (mem_image[k].label_value);
 			gtk_widget_show (mem_image[k].label_addr_octal);
@@ -514,7 +772,8 @@ void display_memory_array( s_mem_word* ptr_mem_array, GtkWidget* vtable) {
 	gtk_table_resize (GTK_TABLE(vtable),k,4);
 }
 
-void execute_instructions(int flag_step) {
+void init() 
+{
 	// - Debug Print Strings:
 	// - Debug Flags:
 	debug.mem_display = 0;
@@ -525,6 +784,28 @@ void execute_instructions(int flag_step) {
 	// Effective Address
 	curr_eaddr.EAddr = 0;
 
+	
+	
+	// clear the trace files
+	if ((fp_tracefile = fopen(trace_filename, "w+")) == NULL) {
+		fprintf (stderr, "Unable to open trace file %s\n", trace_filename);
+		exit (1);
+	}
+	fclose(fp_tracefile);
+	if ((fp_branchtrace = fopen(branch_filename, "w+")) == NULL) {
+		fprintf (stderr, "Unable to open trace file %s\n", branch_filename);
+		exit (1);
+	}
+	// print header for branch trace file
+	fprintf(fp_branchtrace,"PC [octal]    BRANCH TYPE         TAKEN/NOT TAKEN    TARGET ADDRESS [octal]\n");
+	fprintf(fp_branchtrace,"---------------------------------------------------------------------------\n");
+	fclose(fp_branchtrace);
+}
+
+void execute_instructions(int flag_step) 
+{
+	char buffer[512]; // temp buffer for formatting string for IR binary
+	
 	// Initialize and allocate space for debug print strings
 	char* curr_opcode_str = malloc((DEBUG_STR_LEN*sizeof(char))+1);
 	if (curr_opcode_str == NULL) {
@@ -592,37 +873,30 @@ void execute_instructions(int flag_step) {
 		exit(-1);
 	}
 	
+	
+	// initialize breakpoint flag to FALSE.
+	int flag_break = 0;
+	
+	// clear read/write index data; set it out of range of the memory array indices
+	gui_last_instr.index_read = PDP8_MEMSIZE+1;
+	gui_last_instr.index_write = PDP8_MEMSIZE+1;
+	gui_last_instr.index_eaddr_read = PDP8_MEMSIZE+1;
+	gui_last_instr.index_eaddr_write = PDP8_MEMSIZE+1;
+
 	// Open the trace and branch trace files.
-	if ((fp_tracefile = fopen(trace_filename, "w+")) == NULL) {
-		fprintf (stderr, "Unable to open trace file %s\n", trace_filename);
-		exit (1);
-	}
-	fclose(fp_tracefile);
 	if ((fp_tracefile = fopen(trace_filename, "a")) == NULL) {
 		fprintf (stderr, "Unable to open trace file %s\n", trace_filename);
 		exit (1);
 	}
-	if ((fp_branchtrace = fopen(branch_filename, "w+")) == NULL) {
-		fprintf (stderr, "Unable to open trace file %s\n", branch_filename);
-		exit (1);
-	}
-	fclose(fp_branchtrace);
 	if ((fp_branchtrace = fopen(branch_filename, "a")) == NULL) {
 		fprintf (stderr, "Unable to open trace file %s\n", branch_filename);
 		exit (1);
 	}
 	// Note: Leave trace files open for append.
 	
-	// print header for branch trace file
-	fprintf(fp_branchtrace,"PC [octal]    BRANCH TYPE         TAKEN/NOT TAKEN    TARGET ADDRESS [octal]\n");
-	fprintf(fp_branchtrace,"---------------------------------------------------------------------------\n");
-	
-	//int counter = 0;
-	
 	//======================================================
 	// MAIN LOOP
-	//while (!flag_HLT && (counter < 10)) {
-	while (!flag_HLT) {
+	do {
 		//counter++;
 		effective_address = 0;
 		memval_eaddr = 0;
@@ -631,6 +905,12 @@ void execute_instructions(int flag_step) {
 		reg_IR = read_mem(reg_PC, TF_FETCH, &mem_array[0], fp_tracefile);
 		// set opcode
 		curr_opcode = reg_IR >> (PDP8_WORD_SIZE - INSTR_OP_LOW - 1);
+		
+		// check if there was a breakpoint set on this instruction
+		// (if so, stop execution AFTER this instruction completes)
+		if (mem_array[reg_PC].breakpoint) {
+			flag_break = TRUE;
+		}
 		
 		// update stat for instruction count
 		stat_instructions = stat_instructions + 1;
@@ -663,7 +943,7 @@ void execute_instructions(int flag_step) {
 		
 		// STEP 2: CALCULATE EFFECTIVE ADDRESS IF NEEDED
 		if ((curr_opcode >= 0) && (curr_opcode <= 5)) {
-			curr_eaddr = calc_eaddr(reg_IR, reg_PC, &mem_array[0], fp_tracefile, debug.eaddr);
+			curr_eaddr = calc_eaddr(reg_IR, reg_PC, &mem_array[0], fp_tracefile, debug.eaddr, &gui_last_instr);
 			effective_address = curr_eaddr.EAddr;
 		}
 											
@@ -700,39 +980,29 @@ void execute_instructions(int flag_step) {
 		else if(debug.short_mode)	//Shortened version. Only want if the long version is off.  Shows changes caused at current PC by current OP.
 		{
 			printf("              PC: %s [%04o]\n", bin_str_PC, reg_PC);
-			// This would print current values of LR/AC:
-			//printf("  %s   LR: %o AC: %s [%4o]\n", curr_opcode_str, reg_LR, bin_str_AC, reg_AC);
-			/*
-			switch (curr_opcode) {
-				case OP_AND:	printf("  AND    LR: %s AC: %s [%3x]\n", reg_LR, next_vals.AC, next_vals.AC);
-								break;
-				case OP_TAD:  	printf("  TAD    LR: %b AC: %b [%3x]\n", next_vals.LR, next_vals.AC, next_vals.AC);
-								break;
-				case OP_ISZ:  	printf("  ISZ    LR: %b AC: %b [%3x]\n", reg_LR, reg_AC, reg_AC);
-								break;
-				case OP_DCA:  	printf("  DCA    LR: %b AC: %b [%3x]\n", reg_LR, next_vals.AC, next_vals.AC);
-								break;
-				case OP_JMS:  	printf("  JMS    LR: %b AC: %b [%3x]\n", reg_LR, reg_AC, reg_AC);
-								break;
-				case OP_JMP:  	printf("  JMP    LR: %b AC: %b [%3x]\n", reg_LR, reg_AC, reg_AC);
-								break;
-				case OP_IO:   	printf("  IO     LR: %b AC: %b [%3x]\n", reg_LR, next_vals.AC, next_vals.AC);
-								break;
-				case OP_UI:   	printf("  UI     LR: %b AC: %b [%3x]\n", next_vals.LR, next_vals.AC, next_vals.AC);
-								break;
-				default: printf("WARNING! UNKNOWN OP CODE LR: %b AC: %b [%x]\n", reg_LR, reg_AC, reg_AC);
-								break;
-			}
-			*/
 		}
 		
-		// SET NEXT_PC
+		// set up format for the IR value
+		strncpy(gui_last_instr.IR_detail, "   0   1   2   3   4   5   6   7   8   9  10  11\n",MAX_IR_DETAIL);
+		strncat(gui_last_instr.IR_detail," +---+---+---+---+---+---+---+---+---+---+---+---+\n",MAX_IR_DETAIL);
+		sprintf(buffer," | %c | %c | %c | %c | %c | %c | %c | %c | %c | %c | %c | %c |\n",
+			bin_str_IR[0],bin_str_IR[1],bin_str_IR[2],bin_str_IR[3],bin_str_IR[4],bin_str_IR[5],
+			bin_str_IR[6],bin_str_IR[7],bin_str_IR[8],bin_str_IR[9],bin_str_IR[10],bin_str_IR[11]);
+		strncat(gui_last_instr.IR_detail,buffer,MAX_IR_DETAIL);
+		strncat(gui_last_instr.IR_detail," +---+---+---+---+---+---+---+---+---+---+---+---+\n",MAX_IR_DETAIL);
+		// save PC of executed instruction
+		gui_last_instr.last_PC = reg_PC;
+		// save opcode string
+		strncpy(gui_last_instr.str_opcode, curr_opcode_str, 15);
+		
+		// STEP 3: SET NEXT_PC
 		next_PC = (reg_PC + 1) & address_mask;
 		
 		// STEP 4: EXECUTE CURRENT INSTRUCTION
 		switch (curr_opcode) {
 			case OP_AND:	// first, load the value from memory at the effective address
 							memval_eaddr = read_mem(effective_address, TF_READ, &mem_array[0], fp_tracefile);
+							gui_last_instr.index_read = effective_address;
 							// AC = AC AND M[EAddr]
 							next_AC = reg_AC & memval_eaddr;
 							// Debug Print
@@ -743,6 +1013,7 @@ void execute_instructions(int flag_step) {
 							break;
 			case OP_TAD:  	// first, load the value from memory at the effective address
 							memval_eaddr = read_mem(effective_address, TF_READ, &mem_array[0], fp_tracefile);
+							gui_last_instr.index_read = effective_address;
 							// AC = AC + M[EAddr];
 							// LR is inverted if the above addition operation results in carry out
 							next_AC = reg_AC + memval_eaddr;
@@ -759,10 +1030,12 @@ void execute_instructions(int flag_step) {
 							break;
 			case OP_ISZ:  	// first, load the value from memory at the effective address
 							memval_eaddr = read_mem(effective_address, TF_READ, &mem_array[0], fp_tracefile);
+							gui_last_instr.index_read = effective_address;
 							flag_branch_taken = 0;	// initialize flag that branch was taken to false.
 							next_memval_eaddr = (memval_eaddr + 1) & address_mask; // increment M[EAddr]
 							// write updated value to memory
 							write_mem(effective_address, next_memval_eaddr, &mem_array[0], fp_tracefile);
+							gui_last_instr.index_write = effective_address;
 							// if updated value == 0, then the next instruction should be skipped
 							if (next_memval_eaddr == 0) {
 								flag_branch_taken = 1;
@@ -777,6 +1050,7 @@ void execute_instructions(int flag_step) {
 							break;
 			case OP_DCA:  	// write AC to memory
 							write_mem(effective_address, reg_AC, &mem_array[0], fp_tracefile);
+							gui_last_instr.index_write = effective_address;
 							next_AC = 0;
 							// Debug Print
 							if (debug.module) printf("               NEXT AC: [%04o]\n", next_AC);
@@ -787,6 +1061,7 @@ void execute_instructions(int flag_step) {
 							next_PC = (effective_address + 1) & address_mask;
 							// write updated value to memory
 							write_mem(effective_address, next_memval_eaddr, &mem_array[0], fp_tracefile);
+							gui_last_instr.index_write = effective_address;
 							// Debug Print
 							if (debug.module) printf("               NEXT PC: [%04o]\n", next_PC);
 							if (debug.module) printf("         NEXT M[EAddr]: [%04o]\n", next_memval_eaddr);
@@ -814,6 +1089,21 @@ void execute_instructions(int flag_step) {
 								printf("               NEXT PC: [%04o]\n", next_vals.PC);
 								printf("            NEXT LR/AC: %x/%03x [%o/%04o]\n",next_vals.LR,next_vals.AC,next_vals.LR,next_vals.AC);
 							}
+							// GUI string detail
+							if ( ((reg_IR >> (PDP8_WORD_SIZE-3-1)) & 1) == 0) {
+								// Group 1 micro ops
+								strncat(gui_last_instr.IR_detail,"                  cla cll cma cml rar ral 0/1 iac\n",MAX_IR_DETAIL);
+							} 
+							else if (((reg_IR >> (PDP8_WORD_SIZE - 11-1)) & 1) == 0) {
+								// Group 2 micro ops
+								if (((reg_IR >> (PDP8_WORD_SIZE - 8-1)) & 1) == 0) { // OR Group
+									strncat(gui_last_instr.IR_detail,"                  cla sma sza snl 0/1 osr hlt\n",MAX_IR_DETAIL);
+								}
+								else { // AND Group
+									strncat(gui_last_instr.IR_detail,"                  cla spa sna szl 0/1 osr hlt\n",MAX_IR_DETAIL);
+								}
+							}
+							
 							// update branch statistics, and write to branch trace file
 							write_branch_trace(fp_branchtrace, reg_PC, curr_opcode, next_vals.PC, next_vals.flag_branch_taken, next_vals.flag_branch_type, &branch_statistics);
 							next_PC = next_vals.PC;
@@ -885,12 +1175,32 @@ void execute_instructions(int flag_step) {
 			default: printf("WARNING! UNKNOWN OP CODE LR: %o AC: %03x [%04o]\n", reg_LR, reg_AC, reg_AC);
 							break;
 		}
-	}
-	
+	} while (!flag_HLT && !flag_step && !flag_break);
 	// END MAIN LOOP
 	//======================================================
 	
+	// free the debug strings
+	free(curr_opcode_str);
+	free(bin_str_PC);
+	free(bin_str_next_PC);
+	free(bin_str_IR);
+	free(bin_str_AC);
+	free(bin_str_next_AC);
+	free(bin_str_LR);
+	free(bin_str_next_LR);
+	free(bin_str_SR);
+	free(bin_str_EAddr);
+	free(bin_str_next_EAddr);
+	free(bin_str_memval_EAddr);
+	free(bin_str_next_memval_EAddr);
 	
+	// close the trace files
+	fclose(fp_tracefile);
+	fclose(fp_branchtrace);
+}
+	
+void print_statistics()
+{
 	//======================================================
 	// PRINT OUT STATISTICS AND MEMORY IMAGE
 	//----------------------------------------
@@ -933,9 +1243,5 @@ void execute_instructions(int flag_step) {
 	printf("=====================================================\n");
 	// END PRINTING OF STATISTICS
 	//======================================================
-	
-	
-	// close the trace files
-	fclose(fp_tracefile);
-	fclose(fp_branchtrace);
 }
+

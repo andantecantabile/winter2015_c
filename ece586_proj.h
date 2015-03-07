@@ -9,8 +9,8 @@
 //=========================================================
 // GENERAL PARAMETERS:
 //---------------------
-#define TRUE 1
-#define FALSE 0
+//#define TRUE 1
+//#define FALSE 0
 
 // TRACE FILE PARAMETERS:
 //#define FILENAME_MAX_LEN 50  // max number of characters for file name
@@ -77,6 +77,9 @@
 // DEBUG PRINT STATEMENTS
 #define DEBUG_STR_LEN 30
 #define DEBUG_STR_N (DEBUG_STR_LEN-1)
+
+// GUI 
+#define MAX_IR_DETAIL 2048
 //---------------------------	
 // END PARAMETER SECTION
 //=========================================================
@@ -93,6 +96,7 @@
 typedef struct _mem_word {
 	short int value;	// value of the word stored at a memory location
 	char valid; 		// "valid bit" indicating if the data is valid
+	char breakpoint;
 } s_mem_word;
 
 // STRUCT definition for return values from effective address module
@@ -140,6 +144,20 @@ typedef struct _branch_stats {
 	int UI_cond_nt_count;		// number of UI conditional branches NOT taken
 	int UI_uncond_nt_count;	// number of UI unconditional (SKP) branches NOT taken
 } s_branch_stats;
+
+// VARIABLES FOR GUI 
+typedef struct _gui_instr_vals {
+	short int last_PC; // value of the last executed PC
+
+	int index_eaddr_read;	// these four "index" values are used to save 
+	int index_eaddr_write; 	// the value of the index (into the memory array)
+	int index_read;			// at which a read, write was performed in the 
+	int index_write;		// execution of the last completed instruction.
+	// these are initialized to NULL at the start of each instruction.
+	
+	char str_opcode[15];
+	char IR_detail[MAX_IR_DETAIL];	// has the detailed IR view
+} guiInstrVals;
 
 //---------------------------	
 // END STRUCT DEFINITIONS
@@ -521,7 +539,7 @@ void write_mem(short int address, short int value, s_mem_word* ptr_mem_array, FI
 // Note: Uses the ADDR_INDIRECT_ADDR_BIT and the
 //    ADDR_MEMORY_PAGE_BIT defined above.
 //---------------------------------------------------------
-s_effective_addr calc_eaddr(short int reg_IR, short int reg_PC, s_mem_word* ptr_mem_array, FILE* fp_tracefile, char debug)
+s_effective_addr calc_eaddr(short int reg_IR, short int reg_PC, s_mem_word* ptr_mem_array, FILE* fp_tracefile, char debug, guiInstrVals* gui_instr)
 {
 	s_effective_addr ret_EAddr;	// struct to be returned
 	short int EffectiveAddress; // temporary EAddr value 
@@ -686,6 +704,7 @@ s_effective_addr calc_eaddr(short int reg_IR, short int reg_PC, s_mem_word* ptr_
 					IndirectAddrLoc = CurrentOffset;
 					//FUNCTION CALL TO READMEM FOR LOG
 					EffectiveAddress = read_mem(IndirectAddrLoc, TF_READ, ptr_mem_array, fp_tracefile);	
+					gui_instr->index_eaddr_read = IndirectAddrLoc;
 					//EffectiveAddress = *(ptr_mem_array+IndirectAddrLoc);
 					
 					// convert to binary string for debug print
@@ -704,6 +723,7 @@ s_effective_addr calc_eaddr(short int reg_IR, short int reg_PC, s_mem_word* ptr_
 					IndirectAddrLoc = CurrentPage + CurrentOffset;
 					//FUNCTION CALL TO READMEM TO OBTAIN VALUE at IndirectAddrLoc
 					EffectiveAddress = read_mem(IndirectAddrLoc, TF_READ, ptr_mem_array, fp_tracefile);
+					gui_instr->index_eaddr_read = IndirectAddrLoc;
 					//EffectiveAddress = *(ptr_mem_array+IndirectAddrLoc);
 					
 					// convert to binary string for debug print
@@ -731,6 +751,7 @@ s_effective_addr calc_eaddr(short int reg_IR, short int reg_PC, s_mem_word* ptr_
 				
 				// FUNCTION CALL TO READMEM to obtain effective address
 				EffectiveAddress = read_mem(IndirectAddrLoc, TF_READ, ptr_mem_array, fp_tracefile);
+				gui_instr->index_eaddr_read = IndirectAddrLoc;
 				
 				// convert to binary string for debug print
 				int_to_binary_str(EffectiveAddress, PDP8_ADDR_SIZE, &p_str_EAddr);
@@ -750,6 +771,7 @@ s_effective_addr calc_eaddr(short int reg_IR, short int reg_PC, s_mem_word* ptr_
 				
 				// Write new value to memory
 				write_mem(IndirectAddrLoc, EffectiveAddress, ptr_mem_array, fp_tracefile);
+				gui_instr->index_eaddr_write = IndirectAddrLoc;
 				
 				// set flag to indicate auto-index addressing was used
 				ret_EAddr.flag_MemType_AutoIndex = TRUE;
