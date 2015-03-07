@@ -96,7 +96,7 @@
 typedef struct _mem_word {
 	short int value;	// value of the word stored at a memory location
 	char valid; 		// "valid bit" indicating if the data is valid
-	char breakpoint;
+	//char breakpoint;
 } s_mem_word;
 
 // STRUCT definition for return values from effective address module
