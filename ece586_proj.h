@@ -148,7 +148,9 @@ typedef struct _branch_stats {
 // VARIABLES FOR GUI 
 typedef struct _gui_instr_vals {
 	short int last_PC; // value of the last executed PC
-
+	short int last_eaddr; // value of last effective address
+	char flag_eaddr; // flag indicating that an effective address was last used.
+	
 	int index_eaddr_read;	// these four "index" values are used to save 
 	int index_eaddr_write; 	// the value of the index (into the memory array)
 	int index_read;			// at which a read, write was performed in the 
@@ -799,6 +801,15 @@ s_effective_addr calc_eaddr(short int reg_IR, short int reg_PC, s_mem_word* ptr_
 		
 		if (debug) printf("Calculated Effective Address: %x [%04o]\n",EffectiveAddress,EffectiveAddress);
 		ret_EAddr.EAddr = EffectiveAddress; // save calculated EAddr to return value struct
+		
+		// set entries in gui values struct
+		gui_instr->flag_eaddr = TRUE;
+		gui_instr->last_eaddr = EffectiveAddress;
+	}
+	else {
+		// otherwise, no effective address was used
+		gui_instr->flag_eaddr = FALSE;
+		gui_instr->last_eaddr = 0;
 	}
 		
 	return ret_EAddr;
