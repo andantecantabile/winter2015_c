@@ -373,6 +373,9 @@ int main (int argc, char* argv[])
 							if ((next_AC >> PDP8_WORD_SIZE) != 0) {
 								next_LR = reg_LR ^ 1; // this will flip the least significant bit of the LR.
 							}
+							else {
+								next_LR = reg_LR;
+							}
 							next_AC = next_AC & word_mask; 	// then clear higher-order bits in next_AC beyond
 															// the size of the word
 							// Debug Print

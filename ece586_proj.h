@@ -184,6 +184,7 @@ void int_to_binary_str(int x, int max_digits, char* str_binary[])
 			}
 			i++; // increment the array position
 		}
+		*(*(str_binary)+i) = '\0';
 		//if (debug) printf("\n");
 		
 		//if (debug) printf("   str_binary: %s\n",*str_binary);
@@ -966,6 +967,10 @@ s_updated_vals module_UI (short int IR, short int PC, short int AC, char LR, sho
 			// Rotate left:
 			// Check if bit 9 is 1: RAL
 			if (((IR >> (PDP8_WORD_SIZE - 9-1)) & 1) == 1) {
+				// Let tmp_val be set to the concatenation of LR and AC, 
+				// {LR,AC}
+				tmp_val = (ret_vals.LR << PDP8_WORD_SIZE) + ret_vals.AC;
+				
 				// Check if bit 10 is 0: If so, only need to rotate one bit position
 				if (((IR >> (PDP8_WORD_SIZE - 10-1)) & 1) == 0) {
 					// First set the least significant bit of tmp_rotate to be
