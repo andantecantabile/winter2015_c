@@ -96,7 +96,7 @@
 typedef struct _mem_word {
 	short int value;	// value of the word stored at a memory location
 	char valid; 		// "valid bit" indicating if the data is valid
-	//char breakpoint;
+	char breakpoint;
 } s_mem_word;
 
 // STRUCT definition for return values from effective address module
@@ -182,6 +182,7 @@ void int_to_binary_str(int x, int max_digits, char* str_binary[])
 		//int y = 2^(max_digits-1);
 		int y = 1 << (max_digits-1);
 		int i = 0; // offset into the char[] array
+		int j = 0; // loop index
 		//int debug = 1;	// debug flag
 		
 		//if (debug) printf("DEBUG: int_to_binary_str()\n");
@@ -190,8 +191,9 @@ void int_to_binary_str(int x, int max_digits, char* str_binary[])
 		//if (debug) printf("  str_binary: %x\n",(unsigned int)str_binary);
 		//if (debug) printf("  Binary digits: ");
 
-		for (; y > 0; y = (y >> 1))
-		{		
+		//for (; y > 0; y = (y >> 1))
+		for (j = 0; j < max_digits; j++)
+		{
 			if ((x & y) == y) {
 				*(*(str_binary)+i) = '1';
 				//if (debug) printf("1");
@@ -201,8 +203,10 @@ void int_to_binary_str(int x, int max_digits, char* str_binary[])
 				//if (debug) printf("0");
 			}
 			i++; // increment the array position
+			y = y >> 1;
 		}
 		//if (debug) printf("\n");
+		*(*(str_binary)+i) = '\0';
 		
 		//if (debug) printf("   str_binary: %s\n",*str_binary);
 	}
@@ -231,7 +235,6 @@ void load_memory_array(s_mem_word* ptr_mem_array, char* input_filename, char DEB
 	// all valid bits must be initialized to 0
 	for(i = 0; i <= MEM_ARRAY_MAX; i=i+1) {
 		(ptr_mem_array+i)->valid = 0;
-		(ptr_mem_array+i)->breakpoint = 0;
 	}
 	
 	// Open the input file to read in values to the memory array.
@@ -857,6 +860,8 @@ s_updated_vals module_UI (short int IR, short int PC, short int AC, char LR, sho
 			str_IR[6],str_IR[7],str_IR[8],str_IR[9],str_IR[10],str_IR[11]);
 		printf(" +---+---+---+---+---+---+---+---+---+---+---+---+\n");
 	}
+
+	//if (debug) printf("previous AC: %03x [%04o]\n",ret_vals.AC,ret_vals.AC);
 	
 	// Group 1 Microinstructions: Check if bit 3 is a 0
 	if ( ((IR >> (PDP8_WORD_SIZE-3-1)) & 1) == 0) {
@@ -893,7 +898,7 @@ s_updated_vals module_UI (short int IR, short int PC, short int AC, char LR, sho
 			// Check if bits 6 and 7 were set
 			// Check if bits 4 and 5 were set
 			if ( ((IR >> (PDP8_WORD_SIZE - 6-1)) & 1) == 1) {
-				ret_vals.AC = ~(ret_vals.AC);
+				ret_vals.AC = (~(ret_vals.AC)) & word_mask;
 				if (debug) {
 					printf(" -- Complement Accumulator\n");
 					printf("                NEW AC: %03x [%04o]\n", ret_vals.AC, ret_vals.AC);
@@ -910,7 +915,7 @@ s_updated_vals module_UI (short int IR, short int PC, short int AC, char LR, sho
 			// Sequence 3: IAC
 			// Check if bit 11 is set
 			if ( ((IR >> (PDP8_WORD_SIZE - 11-1)) & 1) == 1) {
-				ret_vals.AC = (ret_vals.AC) + 1;
+				ret_vals.AC = ((ret_vals.AC) & word_mask) + 1;
 				if ((ret_vals.AC >> PDP8_WORD_SIZE) != 0) {
 					ret_vals.LR = (ret_vals.LR) ^ 1; // this will flip the least significant bit of the LR.
 				}
@@ -939,6 +944,8 @@ s_updated_vals module_UI (short int IR, short int PC, short int AC, char LR, sho
 				// Let tmp_val be set to the concatenation of LR and AC, 
 				// {LR,AC}
 				tmp_val = (ret_vals.LR << PDP8_WORD_SIZE) + ret_vals.AC;
+
+				//if (debug) printf("tmp_val: %x\n",tmp_val);
 				
 				// Rotate right:
 				// Check if bit 10 is 0: If so, only need to rotate one bit position
@@ -989,6 +996,10 @@ s_updated_vals module_UI (short int IR, short int PC, short int AC, char LR, sho
 			// Rotate left:
 			// Check if bit 9 is 1: RAL
 			if (((IR >> (PDP8_WORD_SIZE - 9-1)) & 1) == 1) {
+				// Let tmp_val be set to the concatenation of LR and AC, 
+				// {LR,AC}
+				tmp_val = (ret_vals.LR << PDP8_WORD_SIZE) + ret_vals.AC;
+
 				// Check if bit 10 is 0: If so, only need to rotate one bit position
 				if (((IR >> (PDP8_WORD_SIZE - 10-1)) & 1) == 0) {
 					// First set the least significant bit of tmp_rotate to be

@@ -65,6 +65,7 @@ void execute_instructions();
 void display_memory_array( s_mem_word* ptr_mem_array, GtkWidget* vtable);
 //void display_reg_values( gtkRegisterValues* gui_curr_reg, guiInstrVals* gui_last_instr);
 void display_reg_values();
+void print_statistics();
 
 /* GLOBAL VARIABLES */
 // NOTE: Given more time, these should be moved into main() or other
@@ -128,7 +129,10 @@ int stat_ui = 0;
 guiInstrVals gui_last_instr; // settings for last instruction executed
 gtkRegisterValues gui_reg_values; // gui labels for the current register values
 GtkWidget *vtable_mem;
+GtkToolItem *toolitem_start;
+GtkToolItem *toolitem_step;
 int curr_mem_rows;	// number of memory array rows currently being displayed.
+short int breakpoint_list[25];
 
 // Function to create an image box
 GtkWidget *create_img_box( char* filename, GtkWidget *image, gchar *label_text)
@@ -176,7 +180,7 @@ void toggle_statusbar(GtkWidget *widget, gpointer statusbar)
 // set/remove breakpoints
 void toggle_breakpoint_button_callback (GtkWidget *widget, gpointer data)
 {
-    char buffer[20];	// temp buffer string
+    	char buffer[20];	// temp buffer string
 	char str_mem_index[10];
 	char str_disp_index[10];
 	//int oct_addr;	// octal address
@@ -185,7 +189,7 @@ void toggle_breakpoint_button_callback (GtkWidget *widget, gpointer data)
 	//int i = 0;	// temp val for calc
 	
 	// get the button label data
-	strncpy(buffer,(char *) gtk_label_get_text((GtkLabel*) data),100);
+	strncpy(buffer,(char *) gtk_label_get_text((GtkLabel*) data),18);
 	// then parse it to get both the memory index and the display index
 	//str_mem_index = strtok(buffer," ");
 	strncpy(str_mem_index, strtok(buffer," "),9);
@@ -193,8 +197,9 @@ void toggle_breakpoint_button_callback (GtkWidget *widget, gpointer data)
 	strncpy(str_disp_index, strtok(NULL," "),9); 
 	addr = atoi(str_mem_index);
 	disp_i = atoi(str_disp_index);
-	fprintf(stderr,"buffer: %s\n",buffer);
-	fprintf(stderr, "addr: %d [%s], disp_i: %d [%s]\n",addr, str_mem_index, disp_i, str_disp_index);
+	// debug prints:	
+	//fprintf(stderr,"buffer: %s\n",buffer);
+	//fprintf(stderr, "addr: %d [%s], disp_i: %d [%s]\n",addr, str_mem_index, disp_i, str_disp_index);
 	
 	/*
 	//oct_addr = atoi(buffer);
@@ -205,7 +210,7 @@ void toggle_breakpoint_button_callback (GtkWidget *widget, gpointer data)
 	}
 	*/
 	
-	/*
+
 	// check what the current breakpoint value is, and switch the value
 	if (mem_array[addr].breakpoint)
 	{	// if it was on, turn it off
@@ -223,7 +228,7 @@ void toggle_breakpoint_button_callback (GtkWidget *widget, gpointer data)
 		gtk_image_set_from_file((GtkImage*) mem_image[disp_i].button_image, "img_gtk-media-rec-22.png");
 		gtk_widget_queue_draw(mem_image[disp_i].button_image);
 	}
-	*/
+
 }
 
 void gtk_step_clicked(GtkWidget *widget, gpointer data)
@@ -267,9 +272,9 @@ int main (int argc, char* argv[])
   // WINDOW ITEMS
   GtkWidget *window;
   GtkWidget *scrolled_window;
-  GtkWidget *vtable1;
+  //GtkWidget *vtable1;
   GtkWidget *vframe_mem;
-  GtkWidget *vtable_mem_header;
+  //GtkWidget *vtable_mem_header;
   GtkWidget *mem_separator;
   GtkWidget *lbl_vtable_mem_header_addr;
   GtkWidget *lbl_vtable_mem_header_value;
@@ -284,7 +289,7 @@ int main (int argc, char* argv[])
   GtkWidget *vbox4;
   
   // IMAGE ICON ITEMS
-  GtkWidget *image_box;
+  //GtkWidget *image_box;
 
   // MENU ITEMS
   GtkWidget *menubar;
@@ -306,8 +311,6 @@ int main (int argc, char* argv[])
   GtkToolItem *toolitem_restart;
   GtkToolItem *toolitem_open;
   GtkToolItem *toolitemsep;
-  GtkToolItem *toolitem_start;
-  GtkToolItem *toolitem_step;
   
   // CURRENT REGISTER VALUES
   GtkWidget *vbox2a;
@@ -327,7 +330,7 @@ int main (int argc, char* argv[])
   GtkWidget *hbox6;
   GtkWidget *hbox7;
   GtkWidget *hsep1;
-  GtkWidget *hsep2;  
+  //GtkWidget *hsep2;  
   
   //char buffer[1024];
   curr_mem_rows = 0; // initialized memory array rows currently displayed to be 0
@@ -803,6 +806,8 @@ void display_memory_array( s_mem_word* ptr_mem_array, GtkWidget* vtable) {
 			sprintf(curr_data_hex, "%03x", (ptr_mem_array+i)->value);
 			// for the data label, store the memory array index, and then the display table index.
 			sprintf(str_data, "%d %d ", i, k);
+			//sprintf(str_data, "%04o %04o ", i, k);	// send 4 digits octal
+
 			
 			// attach widgets to the table - ONLY DO ONCE, if not already attached
 			if (k > curr_mem_rows+2)
@@ -1009,12 +1014,13 @@ void execute_instructions(int flag_step)
 		// set opcode
 		curr_opcode = reg_IR >> (PDP8_WORD_SIZE - INSTR_OP_LOW - 1);
 		
+/*
 		// check if there was a breakpoint set on this instruction
 		// (if so, stop execution AFTER this instruction completes)
 		if (mem_array[reg_PC].breakpoint) {
 			flag_break = TRUE;
 		}
-		
+*/		
 		// update stat for instruction count
 		stat_instructions = stat_instructions + 1;
 		
@@ -1086,13 +1092,13 @@ void execute_instructions(int flag_step)
 		}
 		
 		// set up format for the IR value
-		strncpy(gui_last_instr.IR_detail, "   0   1   2   3   4   5   6   7   8   9  10  11\n",MAX_IR_DETAIL);
-		strncat(gui_last_instr.IR_detail," +---+---+---+---+---+---+---+---+---+---+---+---+\n",MAX_IR_DETAIL);
-		sprintf(buffer," | %c | %c | %c | %c | %c | %c | %c | %c | %c | %c | %c | %c |\n",
+		strncpy(gui_last_instr.IR_detail, "    0      1     2     3      4     5     6      7     8     9    10    11\n",MAX_IR_DETAIL);
+		strncat(gui_last_instr.IR_detail," +----+----+----+----+----+----+----+----+----+----+----+----+\n",MAX_IR_DETAIL);
+		sprintf(buffer,"  | %c  |  %c  |  %c  |  %c   |  %c  |  %c  |  %c  |  %c  |  %c  |  %c  |  %c  |  %c  |\n",
 			bin_str_IR[0],bin_str_IR[1],bin_str_IR[2],bin_str_IR[3],bin_str_IR[4],bin_str_IR[5],
 			bin_str_IR[6],bin_str_IR[7],bin_str_IR[8],bin_str_IR[9],bin_str_IR[10],bin_str_IR[11]);
 		strncat(gui_last_instr.IR_detail,buffer,MAX_IR_DETAIL);
-		strncat(gui_last_instr.IR_detail," +---+---+---+---+---+---+---+---+---+---+---+---+\n",MAX_IR_DETAIL);
+		strncat(gui_last_instr.IR_detail," +----+----+----+----+----+----+----+----+----+----+----+----+\n",MAX_IR_DETAIL);
 		// save PC of executed instruction
 		gui_last_instr.last_PC = reg_PC;
 		// save opcode string
@@ -1107,21 +1113,25 @@ void execute_instructions(int flag_step)
 							memval_eaddr = read_mem(effective_address, TF_READ, &mem_array[0], fp_tracefile);
 							gui_last_instr.index_read = effective_address;
 							// AC = AC AND M[EAddr]
-							next_AC = reg_AC & memval_eaddr;
+							next_AC = reg_AC & (memval_eaddr & word_mask);
 							// Debug Print
 							if (debug.module) printf("      CURRENT M[EADDR]: [%04o]\n", memval_eaddr);
 							if (debug.module) printf("               NEXT AC: [%04o]\n", next_AC);
 							// Update Registers
-							reg_AC = next_AC;
+							reg_AC = next_AC & word_mask;
 							break;
 			case OP_TAD:  	// first, load the value from memory at the effective address
 							memval_eaddr = read_mem(effective_address, TF_READ, &mem_array[0], fp_tracefile);
 							gui_last_instr.index_read = effective_address;
 							// AC = AC + M[EAddr];
 							// LR is inverted if the above addition operation results in carry out
-							next_AC = reg_AC + memval_eaddr;
+							next_AC = (reg_AC & word_mask) + (memval_eaddr & word_mask);
+							//if (debug.short_mode) printf("next_AC: %x [%o]\n",next_AC, next_AC);
 							if ((next_AC >> PDP8_WORD_SIZE) != 0) {
 								next_LR = reg_LR ^ 1; // this will flip the least significant bit of the LR.
+							}
+							else {
+								next_LR = reg_LR;
 							}
 							next_AC = next_AC & word_mask; 	// then clear higher-order bits in next_AC beyond
 															// the size of the word
@@ -1195,15 +1205,15 @@ void execute_instructions(int flag_step)
 							// GUI string detail
 							if ( ((reg_IR >> (PDP8_WORD_SIZE-3-1)) & 1) == 0) {
 								// Group 1 micro ops
-								strncat(gui_last_instr.IR_detail,"                  cla cll cma cml rar ral 0/1 iac\n",MAX_IR_DETAIL);
+								strncat(gui_last_instr.IR_detail,"                           cla  cll cma cml rar ral 0/1 iac\n",MAX_IR_DETAIL);
 							} 
 							else if (((reg_IR >> (PDP8_WORD_SIZE - 11-1)) & 1) == 0) {
 								// Group 2 micro ops
 								if (((reg_IR >> (PDP8_WORD_SIZE - 8-1)) & 1) == 0) { // OR Group
-									strncat(gui_last_instr.IR_detail,"                  cla sma sza snl 0/1 osr hlt\n",MAX_IR_DETAIL);
+									strncat(gui_last_instr.IR_detail,"                                  cla sma sza snl 0/1 osr hlt\n",MAX_IR_DETAIL);
 								}
 								else { // AND Group
-									strncat(gui_last_instr.IR_detail,"                  cla spa sna szl 0/1 osr hlt\n",MAX_IR_DETAIL);
+									strncat(gui_last_instr.IR_detail,"                                  cla spa sna szl 0/1 osr hlt\n",MAX_IR_DETAIL);
 								}
 							}
 							
@@ -1278,9 +1288,24 @@ void execute_instructions(int flag_step)
 			default: printf("WARNING! UNKNOWN OP CODE LR: %o AC: %03x [%04o]\n", reg_LR, reg_AC, reg_AC);
 							break;
 		}
+
+		// check if there was a breakpoint set on this instruction
+		// (if so, stop execution AFTER this instruction completes)
+		if (mem_array[reg_PC].breakpoint) {
+			flag_break = TRUE;
+		}
+
 	} while (!flag_HLT && !flag_step && !flag_break);
 	// END MAIN LOOP
 	//======================================================
+	
+	if (flag_HLT) {
+		print_statistics();
+		
+		// disable the step and continue buttons
+		gtk_widget_set_sensitive ((GtkWidget*) toolitem_start, FALSE);
+		gtk_widget_set_sensitive ((GtkWidget*) toolitem_step, FALSE);
+	}
 	
 	// free the debug strings
 	free(curr_opcode_str);
