@@ -428,6 +428,7 @@ int main (int argc, char* argv[])
   GtkWidget *lbl_LR;
   GtkWidget *lbl_AC;
   GtkWidget *lbl_SR;
+  GtkWidget *lbl_color_key;
   GtkWidget *hbox1;
   GtkWidget *hbox2;
   GtkWidget *hbox2a;
@@ -437,8 +438,21 @@ int main (int argc, char* argv[])
   GtkWidget *hbox5;
   GtkWidget *hbox6;
   GtkWidget *hbox7;
+  GtkWidget *hbox8;
+  GtkWidget *hbox9;
+ // GtkWidget *hbox10;
   GtkWidget *hsep1;
-  //GtkWidget *hsep2;  
+  GtkWidget *hsep2;
+  GtkWidget *event_box_last_instr;
+  GtkWidget *lbl_eb_last_instr;
+  GtkWidget *event_box_eaddr_read;
+  GtkWidget *lbl_eb_eaddr_read;
+  GtkWidget *event_box_eaddr_write;
+  GtkWidget *lbl_eb_eaddr_write;
+  GtkWidget *event_box_mem_read;
+  GtkWidget *lbl_eb_mem_read;
+  GtkWidget *event_box_mem_write;
+  GtkWidget *lbl_eb_mem_write;
   
   //char buffer[1024];
   curr_mem_rows = 0; // initialized memory array rows currently displayed to be 0
@@ -647,6 +661,60 @@ int main (int argc, char* argv[])
   gtk_widget_show(gui_reg_values.label_SR_hex);
   gtk_widget_show(hbox7);
   gtk_box_pack_start(GTK_BOX(vbox2a), hbox7, TRUE, TRUE, 3);
+  
+  // separator
+  hsep2 = gtk_hseparator_new ();
+  gtk_widget_show(hsep2);
+  gtk_box_pack_start(GTK_BOX(vbox2a), hsep2, TRUE, TRUE, 3);
+  
+  // Color Legend for the Memory Array Window
+  hbox8 = gtk_hbox_new(FALSE, 0);
+  lbl_color_key = gtk_label_new("Color Reference Key for the Memory Window: ");
+  gtk_box_pack_start(GTK_BOX(hbox8), lbl_color_key, FALSE, FALSE, 5);
+  gtk_widget_show(lbl_color_key);
+  gtk_widget_show(hbox8);
+  gtk_box_pack_start(GTK_BOX(vbox2a), hbox8, TRUE, TRUE, 3);
+  
+  hbox9 = gtk_hbox_new(FALSE, 0);
+  event_box_last_instr = gtk_event_box_new();
+  lbl_eb_last_instr = gtk_label_new("   Prev PC   ");
+  gtk_container_add( GTK_CONTAINER(event_box_last_instr), lbl_eb_last_instr);
+  event_box_eaddr_read = gtk_event_box_new();
+  lbl_eb_eaddr_read = gtk_label_new("   EAddr Read   ");
+  gtk_container_add( GTK_CONTAINER(event_box_eaddr_read), lbl_eb_eaddr_read);
+  event_box_eaddr_write = gtk_event_box_new();
+  lbl_eb_eaddr_write = gtk_label_new("   EAddr Write   ");
+  gtk_container_add( GTK_CONTAINER(event_box_eaddr_write), lbl_eb_eaddr_write);
+  event_box_mem_read = gtk_event_box_new();
+  lbl_eb_mem_read = gtk_label_new("   Mem Read   ");
+  gtk_container_add( GTK_CONTAINER(event_box_mem_read), lbl_eb_mem_read);
+  event_box_mem_write = gtk_event_box_new();
+  lbl_eb_mem_write = gtk_label_new("   Mem Write   ");
+  gtk_container_add( GTK_CONTAINER(event_box_mem_write), lbl_eb_mem_write);
+  gtk_box_pack_start(GTK_BOX(hbox9), event_box_last_instr, FALSE, TRUE, 10);
+  gtk_box_pack_start(GTK_BOX(hbox9), event_box_eaddr_read, FALSE, TRUE, 10);
+  gtk_box_pack_start(GTK_BOX(hbox9), event_box_eaddr_write, FALSE, TRUE, 10);
+  gtk_box_pack_start(GTK_BOX(hbox9), event_box_mem_read, FALSE, TRUE, 10);
+  gtk_box_pack_start(GTK_BOX(hbox9), event_box_mem_write, FALSE, TRUE, 10);
+  // set colors
+  gtk_widget_modify_bg(event_box_last_instr, GTK_STATE_NORMAL, &color_last_instr);
+  gtk_widget_modify_bg(event_box_eaddr_read, GTK_STATE_NORMAL, &color_eaddr_read);
+  gtk_widget_modify_bg(event_box_eaddr_write, GTK_STATE_NORMAL, &color_eaddr_write);
+  gtk_widget_modify_bg(event_box_mem_read, GTK_STATE_NORMAL, &color_read);
+  gtk_widget_modify_bg(event_box_mem_write, GTK_STATE_NORMAL, &color_write);
+  // show
+  gtk_widget_show(event_box_last_instr);
+  gtk_widget_show(lbl_eb_last_instr);
+  gtk_widget_show(event_box_eaddr_read);
+  gtk_widget_show(lbl_eb_eaddr_read);
+  gtk_widget_show(event_box_eaddr_write);
+  gtk_widget_show(lbl_eb_eaddr_write);
+  gtk_widget_show(event_box_mem_read);
+  gtk_widget_show(lbl_eb_mem_read);
+  gtk_widget_show(event_box_mem_write);
+  gtk_widget_show(lbl_eb_mem_write);
+  gtk_widget_show(hbox9);
+  gtk_box_pack_start(GTK_BOX(vbox2a), hbox9, TRUE, TRUE, 3);
   
   // create vtable1 to contain the register values on the left hand side and 
   // the memory table (scrolled window) on the right hand side.
