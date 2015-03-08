@@ -8,7 +8,7 @@
 #include <string.h>
 #include <gtk/gtk.h>
 #include <gdk/gdkkeysyms.h>
-#include "ece586_proj.h"
+#include "gui_final.h"
 
 //=========================================================
 // PARAMETER SECTION
