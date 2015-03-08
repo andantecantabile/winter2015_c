@@ -30,6 +30,10 @@
 #define MAIN_WINDOW_HEIGHT 600
 #define SCROLLED_WINDOW_WIDTH 400
 #define SCROLLED_WINDOW_HEIGHT 520
+
+#define BUTTON_IMG_FILE_DEFAULT "img_gtk-clear-rec-22.png"
+#define BUTTON_IMG_FILE_RED "img_gtk-media-rec-22.png"
+#define BUTTON_IMG_FILE_TEAL "img_gtk-teal-rec-22.png"
 //---------------------------	
 // END PARAMETER SECTION
 //=========================================================
@@ -268,15 +272,15 @@ void toggle_breakpoint_button_callback (GtkWidget *widget, gpointer data)
 		mem_array[addr].breakpoint = FALSE;
 		
 		// change button image as well
-		gtk_image_set_from_file((GtkImage*) mem_image[disp_i].button_image, "img_gtk-clear-rec-22.png");
-		//gtk_widget_queue_draw(mem_image[disp_i].button_image);
+		gtk_image_set_from_file((GtkImage*) mem_image[disp_i].button_image, BUTTON_IMG_FILE_DEFAULT);
+		gtk_widget_queue_draw(mem_image[disp_i].button_image);
 	}
 	else {
 		// else, if it was off, turn it on
 		mem_array[addr].breakpoint = TRUE;
 		
 		// change button image as well
-		gtk_image_set_from_file((GtkImage*) mem_image[disp_i].button_image, "img_gtk-media-rec-22.png");
+		gtk_image_set_from_file((GtkImage*) mem_image[disp_i].button_image, BUTTON_IMG_FILE_RED);
 		gtk_widget_queue_draw(mem_image[disp_i].button_image);
 	}
 
@@ -872,7 +876,7 @@ int main (int argc, char* argv[])
 	  
 	  // create image box with the default clear button
 	  //image_box = create_img_box("img_gtk-clear-rec-22.png", mem_image[i].button_image, "0");
-	  mem_image[i].button_image = gtk_image_new_from_file("img_gtk-clear-rec-22.png");
+	  mem_image[i].button_image = gtk_image_new_from_file(BUTTON_IMG_FILE_DEFAULT);
 	  // use gtk_image_set_from_file(image) to update
 	  gtk_widget_queue_draw(mem_image[i].button_image);
 	  // initialize invisible label
@@ -1164,11 +1168,11 @@ void display_memory_array( s_mem_word* ptr_mem_array, GtkWidget* vtable) {
 			// set the button image depending on the value of the 
 			// breakpoint flag
 			if ((ptr_mem_array+i)->breakpoint) {
-				gtk_image_set_from_file((GtkImage*) mem_image[k].button_image, "img_gtk-media-rec-22.png");
+				gtk_image_set_from_file((GtkImage*) mem_image[k].button_image, BUTTON_IMG_FILE_RED);
 				gtk_widget_queue_draw(mem_image[k].button_image);
 			}
 			else {
-				gtk_image_set_from_file((GtkImage*) mem_image[k].button_image, "img_gtk-clear-rec-22.png");
+				gtk_image_set_from_file((GtkImage*) mem_image[k].button_image, BUTTON_IMG_FILE_DEFAULT);
 				gtk_widget_queue_draw(mem_image[k].button_image);
 			}
 			
