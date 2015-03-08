@@ -1,0 +1,217 @@
+   1            / Program : eaddr_test.as
+   2            / Date : February 7th, 2015
+   3            /
+   4            / Desc : This program tests the modes of addressing.
+   5            / Checks for: 
+   6            /     1. Zero Page Addressing
+   7            /     2. Current Page Addressing
+   8            /     3. Indirect / Zero Page Addressing
+   9            /     4. Indirect / Current Page Addressing
+  10            /     5. Auto-indexing
+  11            /
+  12            /-------------------------------------------
+  13            /
+  14            / Code Section
+  15            /
+  16            *0200			/ start at address 0200
+  17 00200 7300 Main, 	cla cll 	/ clear AC and Link
+  18            	/ Test AND instruction - 24 instructions
+  19 00201 1320 	tad ANDstartval	/ set AC to 7777
+  20 00202 0140 	and z A1 		/ zero page addressing
+  21 00203 7640 	sza cla
+  22 00204 7402 	hlt
+  23 00205 1320 	tad ANDstartval	/ indirect current page
+  24 00206 0721 	and i B1
+  25 00207 7640 	sza cla
+  26 00210 7402 	hlt
+  27 00211 1320 	tad ANDstartval	/ indirect zero page
+  28 00212 0541 	and i C1
+  29 00213 7640 	sza cla
+  30 00214 7402 	hlt
+  31 00215 1320 	tad ANDstartval	/ indirect curr page to zero page
+  32 00216 0722 	and i D1
+  33 00217 7640 	sza cla
+  34 00220 7402 	hlt
+  35 00221 1320 	tad ANDstartval	/ auto-indexing
+  36 00222 0410 	and i pArr1
+  37 00223 7640 	sza cla
+  38 00224 7402 	hlt
+  39 00225 1320 	tad ANDstartval
+  40 00226 0411 	and i pArr2
+  41 00227 7640 	sza cla
+  42 00230 7402 	hlt
+  43 00231 1320 	tad ANDstartval
+  44 00232 0412 	and i pArr3
+  45 00233 7640 	sza cla
+  46 00234 7402 	hlt
+  47 00235 1320 	tad ANDstartval
+  48 00236 0413 	and i pArr4
+  49 00237 7640 	sza cla
+  50 00240 7402 	hlt
+  51 00241 5543 	jmp i pTest3
+  52            	/ Test TAD instruction - 16 instructions
+  53            *0400
+  54 00400 1150 Test3,	tad z A2 		/ set accumulator to A; from page zero
+  55 00401 7700 	sma	cla		/ skip next instr if AC < 0, and clear AC
+  56 00402 7402 	hlt
+  57 00403 1721 	tad i B2 	/ test indirect addressing of B
+  58 00404 7700 	sma cla 	/ skip next instr if AC < 0, and clear AC
+  59 00405 7402 	hlt
+  60 00406 1551 	tad i C2 	/ test indirect addressing of C on page zero
+  61 00407 7700 	sma cla
+  62 00410 7402 	hlt
+  63 00411 1724 	tad i D2 	/ test indirect addr. of D, on current page
+  64 00412 7700 	sma cla
+  65 00413 7402 	hlt
+  66 00414 1410 	tad i pArr1	/ auto-indexing 
+  67 00415 7700 	sma cla
+  68 00416 7402 	hlt
+  69 00417 1411 	tad i pArr2	/ auto-indexing 
+  70 00420 7700 	sma cla
+  71 00421 7402 	hlt
+  72 00422 1412 	tad i pArr3	/ auto-indexing 
+  73 00423 7700 	sma cla
+  74 00424 7402 	hlt
+  75 00425 1413 	tad i pArr4	/ auto-indexing 
+  76 00426 7700 	sma cla
+  77 00427 7402 	hlt
+  78            	/ Test ISZ instruction - 8 instructions
+  79 00430 2153 	isz z A3	/ zero page addressing
+  80 00431 7402 	hlt
+  81 00432 2722 	isz i B3	/ indirect curr page
+  82 00433 7402 	hlt
+  83 00434 2554 	isz i C3	/ indirect zero page
+  84 00435 7402 	hlt
+  85 00436 2725 	isz i D3	/ indirect curr page to zero page
+  86 00437 7402 	hlt
+  87 00440 2410 	isz i pArr1	/ auto-indexing
+  88 00441 7402 	hlt
+  89 00442 2411 	isz i pArr2	/ auto-indexing
+  90 00443 7402 	hlt
+  91 00444 2412 	isz i pArr3	/ auto-indexing
+  92 00445 7402 	hlt
+  93 00446 2413 	isz i pArr4	/ auto-indexing
+  94 00447 7402 	hlt
+  95            	/ Test DCA instruction: should result in 8 stores to memory
+  96            	/ 25 instructions
+  97 00450 7200 	cla
+  98 00451 1320 	tad DCAval	/ zero page addressing
+  99 00452 3156 	dca z A4
+ 100 00453 7640 	sza cla
+ 101 00454 7402 	hlt
+ 102 00455 1320 	tad DCAval	/ indirect current page
+ 103 00456 3723 	dca i B4
+ 104 00457 7640 	sza cla
+ 105 00460 7402 	hlt
+ 106 00461 1320 	tad DCAval	/ indirect zero page
+ 107 00462 3557 	dca i C4
+ 108 00463 7640 	sza cla
+ 109 00464 7402 	hlt
+ 110 00465 1320 	tad DCAval	/ indirect current page to zero page
+ 111 00466 3726 	dca i D4
+ 112 00467 7640 	sza cla
+ 113 00470 7402 	hlt
+ 114 00471 1320 	tad DCAval	/ auto-increment addressing
+ 115 00472 3410 	dca i pArr1 
+ 116 00473 7640 	sza cla
+ 117 00474 7402 	hlt
+ 118 00475 1320 	tad DCAval	/ auto-increment addressing
+ 119 00476 3411 	dca i pArr2 
+ 120 00477 7640 	sza cla
+ 121 00500 7402 	hlt
+ 122 00501 1320 	tad DCAval	/ auto-increment addressing
+ 123 00502 3412 	dca i pArr3 
+ 124 00503 7640 	sza cla
+ 125 00504 7402 	hlt
+ 126 00505 1320 	tad DCAval	/ auto-increment addressing
+ 127 00506 3413 	dca i pArr4 
+ 128 00507 7640 	sza cla
+ 129 00510 7402 	hlt
+ 130            	/ +3 instructions
+ 131 00511 7301 	cla cll iac
+ 132 00512 7500 	sma
+ 133 00513 7402 	hlt		/ end of testing
+ 134 00514 5315 	jmp TestError
+ 135 00515 7301 TestError, cla cll iac
+ 136 00516 7402 	hlt
+ 137            /
+ 138            / Data Section
+ 139            /
+ 140            *0140 / page zero
+ 141 00140 0000 A1, 0		/ A1 = 0 for AND test
+ 142 00141 3051 C1, 3051	/ C1 = address of G1
+ 143 00142 0000 H1, 0000	/ H1 = 0 for AND test
+ 144 00143 0400 pTest3, 0400 	/ ptr to Test3
+ 145            *0150 / page zero
+ 146 00150 7777 A2, 7777
+ 147 00151 3053 C2, 3053	/ C2 = address of G2
+ 148 00152 4000 H2, 4000	/ H2 equals -2048
+ 149 00153 7777 A3, 7777	/ -1 for ISZ test
+ 150 00154 3055 C3, 3055	/ C3 = address of G3
+ 151 00155 7777 H3, 7777	/ H3 = -1 for ISZ test
+ 152 00156 0000 A4, 0 		/ placeholder for DCA test
+ 153 00157 3057 C4, 3057 	/ C4 = address of G4
+ 154 00160 0000 H4, 0 		/ placeholder for DCA test
+ 155            *10
+ 156 00010 0267 pArr1,arr1-1
+ 157 00011 0567 pArr2,arr2-1
+ 158 00012 0167 pArr3,arr3-1
+ 159 00013 7027 pArr4,arr4-1
+ 160            *0270 	/ place arr1 at address 0300 = 0x0C0
+ 161 00270 0000 arr1,0000;5252;7777;0;4444;5555;6666;7777
+     00271 5252 
+     00272 7777 
+     00273 0000 
+     00274 4444 
+     00275 5555 
+     00276 6666 
+     00277 7777 
+ 162            *0570
+ 163 00570 0000 arr2,0000;5252;7777;0;3333;2222;1111;0000
+     00571 5252 
+     00572 7777 
+     00573 0000 
+     00574 3333 
+     00575 2222 
+     00576 1111 
+     00577 0000 
+ 164            *0170	/ zero-page
+ 165 00170 0000 arr3,0;5252;7777;0;0;0;0;0
+     00171 5252 
+     00172 7777 
+     00173 0000 
+     00174 0000 
+     00175 0000 
+     00176 0000 
+     00177 0000 
+ 166            *7030	/ off page
+ 167 07030 0000 arr4,0;5252;7777;0;0;0;0;0
+     07031 5252 
+     07032 7777 
+     07033 0000 
+     07034 0000 
+     07035 0000 
+     07036 0000 
+     07037 0000 
+ 168            *0320	/ place data at address 0x0D0
+ 169 00320 7777 ANDstartval, 7777	/ start val for AND tests is -1
+ 170 00321 3050 B1, 3050	/ B1 = address of F1
+ 171 00322 0142 D1, 0142	/ D1 = address of H1
+ 172            *0520
+ 173 00520 6363 DCAval, 6363 	/ value to store for DCA tests
+ 174 00521 3052 B2, 3052	/ B2 = address of F2
+ 175 00522 3054 B3, 3054	/ B3 = address of F3
+ 176 00523 3056 B4, 3056 	/ B4 = address of F4
+ 177 00524 0152 D2, 0152	/ D2 = address of H2
+ 178 00525 0155 D3, 0155	/ D3 = address of H3
+ 179 00526 0160 D4, 0160	/ D4 = address of H4
+ 180            *3050	/ place data at address 0x618
+ 181 03050 0000 F1, 0		/ F1 equals 0 for AND with AC
+ 182 03051 0000 G1, 0		/ G1 equals 0 for AND test
+ 183 03052 7777 F2, 7777	/ F2 equals -1 for TAD test
+ 184 03053 7776 G2, 7776	/ G2 equals -2 for TAD test
+ 185 03054 7777 F3, 7777 	/ F3 equals -1 for ISZ test
+ 186 03055 7777 G3, 7777 	/ G3 equals -1 for ISZ test
+ 187 03056 0000 F4, 0 		/ placeholder for DCA test
+ 188 03057 0000 G4, 0 		/ placeholder for DCA test
+ 189            $Main 		/ End of Program; Main is entry point

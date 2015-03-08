@@ -1,0 +1,36 @@
+   1            / Program : Add01.pal
+   2            / Date : 1/29/2015
+   3            /
+   4            / Desc : This program test the tad command
+   5            /
+   6            /-------------------------------------------
+   7            /
+   8            / Code Section
+   9            /
+  10            *0200			/ start at address 0200
+  11 00200 7300 Main, 	cla cll 	/ clear AC and Link
+  12 00201 5300 	jmp Testa	/ Jump to test
+  13 00202 7402 	hlt
+  14 00203 5200 	jmp Main	/ To continue - goto Main
+  15            /
+  16            / Data Section
+  17            /
+  18            *0250 			/ place data at address 0250
+  19 00250 0002 A, 	2 		
+  20            
+  21            *300
+  22            Testa,
+  23 00300 7040 	cma
+  24            	jmp Testb
+off page        	        ^
+     00301 5777 
+  25 00302 7402 	hlt
+  26            
+  27            
+  28 00377 0400 *400
+  29            Testb,
+  30 00400 7040 	cma
+  31 00401 7402 	hlt
+  32            
+  33            
+  34            $Main 			/ End of Program; Main is entry point

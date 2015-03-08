@@ -1,0 +1,49 @@
+   1            / Program : micro Ops Group 1
+   2            /
+   3            / Testing the combinations of the order of operations groups
+   4            /
+   5            /-------------------------------------------
+   6            /
+   7            / Code Section
+   8            /
+   9            *0200				/ start at address 0200
+  10            Main, 	
+  11 00200 7300 	cla cll 		/ AC=0 LR=0
+  12            					/ Check that all possible combinations of orders of operations interact correctly
+  13 00201 1250 	tad A0			/ Separates uI
+  14 00202 7011 	iac rar			/ AC=0 LR=1
+  15 00203 1253 	tad A3			/ AC=2525 [555] LR=1
+  16 00204 7050 	cma rar			/ AC=6525 [d55] LR=0
+  17 00205 1250 	tad A0			/ Separates uI
+  18 00206 7041 	cma iac			/ AC=1253 [2ab] LR=0
+  19 00207 1250 	tad A0			/ Separates uI
+  20 00210 7051 	cma iac rar		/ AC=3252 [6aa] LR=1
+  21 00211 1250 	tad A0			/ Separates uI
+  22 00212 7210 	cla rar			/ AC=4000 [800] LR=0
+  23 00213 1250 	tad A0			/ Separates uI
+  24 00214 7201 	cla iac			/ AC=1 LR=0
+  25 00215 1253 	tad A3			/ AC=2526 [556] LR=0
+  26 00216 7211 	cla iac rar		/ AC=0 LR=1
+  27 00217 1253 	tad A3			/ AC=2525 [555] LR=0
+  28 00220 7240 	cla cma			/ AC=7777 LR=0
+  29 00221 1253 	tad A3			/ AC=2525 [555] LR=0
+  30 00222 7250 	cla cma rar		/ AC=3777 [7ff] LR=1
+  31 00223 1253 	tad A3			/ AC=2525 [555] LR=0
+  32 00224 7241 	cla cma iac		/ AC=0 LR=1
+  33 00225 1253 	tad A3			/ AC=2525 [555] LR=0
+  34 00226 7251 	cla cma iac rar	/ AC=4000 [800] LR=0
+  35 00227 7402 	hlt 		/ Halt program
+  36 00230 5200 	jmp Main	/ To continue - goto Main
+  37            /
+  38            / Data Section
+  39            /
+  40            *0250 			/ place data at address 0250
+  41 00250 0000 A0, 0
+  42 00251 7777 A1, 7777		/ A is all 1s 
+  43 00252 0001 A2, 1			/ 1 bit
+  44 00253 2525 A3, 2525		/ 010 101 010 101
+  45            
+  46            				/Results
+  47            
+  48            
+  49            $Main 			/ End of Program; Main is entry point

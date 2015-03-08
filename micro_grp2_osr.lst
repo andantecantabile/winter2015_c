@@ -1,0 +1,42 @@
+   1            / Program : micro_grp2_osr.as
+   2            / Date : February 13th, 2015
+   3            /
+   4            / Desc : This program tests cases involving
+   5            /        the OSR and CLA options in the Group 2
+   6            /        microinstructions.
+   7            / Checks for: 
+   8            /     1. Accumulator having the correct value after OSR instruction.
+   9            /     2. Verify that CLA clears the accumulator in the group 2 microinstruction set.
+  10            / Note: Set OSR to 2730 decimal (AAA hexadecimal) for these test cases.
+  11            /-------------------------------------------
+  12            /
+  13            / Code Section
+  14            /
+  15            *0200			/ start at address 0200
+  16 00200 7300 Main, 	cla cll 	/ clear AC and Link; group 1
+  17 00201 7404 	osr 		/ Or contents of SR with AC
+  18 00202 7500 	sma 		/ verify that AC < 0
+  19 00203 7402 	hlt
+  20 00204 3320 	dca A 		/ store contents of accumulator
+  21 00205 7404 	osr 		/ Or contents of SR with AC again
+  22 00206 7010 	rar 		/ rotate AC right one bit
+  23 00207 7404 	osr 		/ Or again
+  24 00210 7500 	sma 		/ again skip if AC < 0
+  25 00211 7402 	hlt
+  26 00212 3321 	dca B		/ store contents of AC
+  27 00213 1321 	tad B 		/ load the value back into AC
+  28 00214 7500 	sma 		/ skip if AC < 0 (verify)
+  29 00215 7402 	hlt
+  30 00216 7604 	osr cla 	/ clear the AC and then OR with SR
+  31 00217 7500 	sma 		/ verify that AC still < 0  
+  32 00220 7402 	hlt
+  33 00221 3322 	dca C 		/ store AC in C <-- this value should be #AAA
+  34 00222 7402 	hlt			/ end test
+  35            /
+  36            / Data Section
+  37            /
+  38            *0320 	/ place data at address 0320 = 0x0D0
+  39 00320 0000 A, 	0 	/ placeholders to store AC later
+  40 00321 0000 B, 	0 
+  41 00322 0000 C,	0
+  42            $Main 			/ End of Program; Main is entry point

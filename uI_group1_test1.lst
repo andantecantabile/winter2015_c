@@ -1,0 +1,77 @@
+   1            / Program : micro Ops Group 1
+   2            /
+   3            / Testing each order of operations separately
+   4            /
+   5            /-------------------------------------------
+   6            /
+   7            / Code Section
+   8            /
+   9            *0200			/ start at address 0200
+  10            Main, 	
+  11 00200 7300 	cla cll 	/ AC=0 LR=0
+  12            				/ Check that each Order of Operations section acts correctly alone
+  13            				/ Order of Operations 1 (combos of cla and cll)
+  14 00201 1251 	tad A1 		/ AC=7777 LR =0
+  15 00202 1252 	tad A2		/ AC=0 LR=1
+  16 00203 1251 	tad A1 		/ AC=7777 LR=1					
+  17 00204 7200 	cla			/ AC=0 LR=1		
+  18 00205 1251 	tad A1		/ AC=7777 LR=1 
+  19 00206 7100 	cll			/ AC=7777 LR=0	
+  20 00207 1252 	tad A2		/ AC=0 LR=1
+  21 00210 1251 	tad A1 		/ AC=7777 LR=1
+  22 00211 7300 	cll cla		/ AC=0 LR=0 
+  23            				/ Order of Operations 2 (combos of cma cml) I12
+  24 00212 1253 	tad A3		/ AC=2525 LR=0
+  25 00213 7040 	cma			/ AC=5252 LR=0
+  26 00214 1250 	tad A0		/ Separate uIs
+  27 00215 7020 	cml			/ AC=5252 LR=1
+  28 00216 1250 	tad A0		/ Separate uIs
+  29 00217 7060 	cma cml		/ AC=2525 LR=0
+  30            				/ Order of Operations 3 (iac) I18
+  31 00220 1250 	tad A0		/ Separate uIs
+  32 00221 7001 	iac			/ AC=2526 LR=0
+  33            				/ Order of Operations 4 (rar, rtr, ral, rtl) I20
+  34 00222 7300 	cll cla		/ AC=0 LR=0
+  35 00223 1251 	tad A1		/ AC=7777 LR=0
+  36 00224 1252 	tad A2		/ AC=0 LR=1
+  37 00225 1253 	tad A3		/ AC=2525 [555] LR=1
+  38 00226 7010 	rar			/ AC=5252 [aaa] LR=1
+  39 00227 1250 	tad A0		/ Separate uIs
+  40 00230 7004 	ral			/ AC=2525 LR=1
+  41 00231 1250 	tad A0		/ Separate uIs
+  42 00232 7014 	rar ral		/ AC=2525 LR=1
+  43 00233 1250 	tad A0		/ Separate uIs
+  44 00234 7012 	rtr			/ AC=6525 [d55] LR=0
+  45 00235 1250 	tad A0		/ Separate uIs
+  46 00236 7006 	rtl			/ AC=2525 LR=1
+  47 00237 1250 	tad A0		/ Separate uIs
+  48 00240 7016 	rtr rtl		/ AC=2525 LR=1
+  49            				/ Check that all possible combinations of orders of operations interact correctly
+  50            	
+  51            	
+  52            	
+  53            	
+  54            	
+  55            	
+  56            	
+  57            	
+  58            	
+  59            	
+  60            	
+  61            	
+  62            	
+  63 00241 7402 	hlt 		/ Halt program
+  64 00242 5200 	jmp Main	/ To continue - goto Main
+  65            /
+  66            / Data Section
+  67            /
+  68            *0250 			/ place data at address 0250
+  69 00250 0000 A0, 0
+  70 00251 7777 A1, 7777		/ A is all 1s 
+  71 00252 0001 A2, 1			/ 1 bit
+  72 00253 2525 A3, 2525		/ 010 101 010 101
+  73            
+  74            				/Results
+  75            
+  76            
+  77            $Main 			/ End of Program; Main is entry point

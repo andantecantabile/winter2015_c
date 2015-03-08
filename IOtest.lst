@@ -1,0 +1,60 @@
+   1            / Program : IO
+   2            /
+   3            /
+   4            /-------------------------------------------
+   5            /
+   6            / Code Section
+   7            /
+   8            *0200			/ start at address 0200
+   9            Main, 	
+  10 00200 7300 	cla cll 	/ clear AC and Link
+  11            /	kfc
+  12 00201 1250 	tad A 		/ add A to Accumulator
+  13            /	kfs
+  14 00202 0251 	and B 		/ and B with A
+  15 00203 6032 	kcc
+  16 00204 3252 	dca C 		/ store sum at C
+  17 00205 6034 	krs
+  18 00206 7300 	cla cll 	/ clear AC and Link
+  19 00207 6036 	krb
+  20 00210 1253 	tad D 		/ add D to Accumulator
+  21            /	tfl
+  22 00211 0254 	and E 		/ and E with D
+  23 00212 6041 	tsf
+  24 00213 3255 	dca F 		/ store sum at F
+  25 00214 6042 	tcf
+  26 00215 7300 	cla cll 	/ clear AC and Link
+  27 00216 6046 	tls
+  28 00217 1256 	tad G 		/ add G to Accumulator
+  29            /	skon
+  30 00220 0257 	and H 		/ and H
+  31 00221 6001 	ion
+  32 00222 3260 	dca I 		/ store sum at I
+  33 00223 6002 	iof
+  34 00224 7300 	cla cll 	/ clear AC and Link
+  35 00225 6036 	kcc krs
+  36 00226 1261 	tad J 		/ add J to Accumulator
+  37 00227 6043 	tsf tcf
+  38 00230 0262 	and K 		/ and K
+  39 00231 6003 	iof ion
+  40 00232 3263 	dca L 		/ store sum at L
+  41 00233 6073 	kcc tcf ion
+  42 00234 7402 	hlt 		/ Halt program
+  43 00235 5200 	jmp Main	/ To continue - goto Main
+  44            /
+  45            / Data Section
+  46            /
+  47            *0250 			/ place data at address 0250
+  48 00250 5252 A, 5252			/ A equals 101 010 101 010 
+  49 00251 2525 B, 2525			/ B equals 010 101 010 101
+  50 00252 7777 C, 7777			/ C equals 111 111 111 111 initially; expect 0
+  51 00253 5252 D, 5252			/ D equals 101 010 101 010  
+  52 00254 7777 E, 7777			/ E equals 111 111 111 111 
+  53 00255 0000 F, 0			/ F equals 000 000 000 000 initially; expect 252
+  54 00256 2525 G, 2525			/ G equals 010 101 010 101 
+  55 00257 7777 H, 7777			/ H equals 111 111 111 111
+  56 00260 0000 I, 0			/ I equals 000 000 000 000 initially; expect 525
+  57 00261 7777 J, 7777			/ G equals 111 111 111 111
+  58 00262 0000 K, 0000			/ H equals 000 000 000 000
+  59 00263 0000 L, 0			/ I equals 000 000 000 000 initially; expect 525
+  60            $Main 			/ End of Program; Main is entry point

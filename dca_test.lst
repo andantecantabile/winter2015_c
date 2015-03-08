@@ -1,0 +1,50 @@
+   1            / Program : dca_test.as
+   2            / Date : January 30th, 2015
+   3            /
+   4            / Desc : This program tests cases involving
+   5            /        the DCA instruction.
+   6            / Checks the following: 
+   7            /     1. store positive number from AC (to variable D)
+   8            /     2. store value 0 from AC (to variable E)
+   9            /     3. store value -1 from AC (to variable F)
+  10            /
+  11            /-------------------------------------------
+  12            /
+  13            / Code Section
+  14            /
+  15            *0200			/ start at address 0200
+  16 00200 7300 Main, 	cla cll 	/ clear AC and Link
+  17            	tad A 		/ add A to AC
+off page        	      	^
+     00201 1777 
+  18            	dca D 		/ store in D and clear AC
+off page        	      	^
+     00202 3776 
+  19            	dca E		/ store in E and clear accumulator
+off page        	     	^
+     00203 3775 
+  20            	tad B 		/ add B to AC
+off page        	      	^
+     00204 1774 
+  21            	dca	F		/ store in F and clear accumulator
+off page        	   	 	^
+     00205 3773 
+  22 00206 3000 	dca			/ check behavior when no location is specified with dca
+  23 00207 7402 	hlt			/ halt - stop program.
+  24 00210 5200 	jmp Main	/ To continue - goto Main
+  25            /
+  26            / Data Section
+  27            /
+  28 00373 7023 *0540 			/ place data at address 0540 = 0x160
+     00374 0541 
+     00375 4305 
+     00376 4304 
+     00377 0540 
+  29 00540 0007 A, 	7 			/ A equals 7
+  30 00541 7777 B, 	7777 		/ B equals -1
+  31            *4304			/ place data at address 0x8C4
+  32 04304 0333 D,  333			/ D equals 0xDB, placeholder value to be written over
+  33 04305 0333 E,  333			/ E equals 0xDB, placeholder value
+  34            *7023			/ place data at address 0xE13
+  35 07023 0333 F,  333			/ F equals 0xDB, placeholder value
+  36            $Main 			/ End of Program; Main is entry point

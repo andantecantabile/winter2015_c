@@ -1,0 +1,64 @@
+   1            / Program : isz_test.as
+   2            / Date : January 30th, 2015
+   3            /
+   4            / Desc : This program tests cases involving
+   5            /        the ISZ instruction.
+   6            / Checks for: 
+   7            /     1. spot check incrementation of positive numbers (variables A, B)
+   8            /     2. incrementation of 0 (variable C)
+   9            /     3. incrementation of -1 (variable D) => should result in skipping next instruction
+  10            /     4. spot check incrementation of a negative number (variable E)
+  11            /     5. incrementation of largest positive number, 2047 = 0x7FF (variable F)
+  12            /
+  13            /-------------------------------------------
+  14            /
+  15            / Code Section
+  16            /
+  17            *0200			/ start at address 0200
+  18 00200 7300 Main, 	cla cll 	/ clear AC and Link
+  19            	isz A 		/ increment A
+off page        	      	^
+     00201 2777 
+  20            	isz B 		/ increment B
+off page        	      	^
+     00202 2776 
+  21            	isz C 		/ increment C
+off page        	      	^
+     00203 2775 
+  22            	dca G		/ clear accumulator
+off page        	     	^
+     00204 3774 
+  23            	isz D 		/ increment D; on first run through, should skip next instruction and loop again 
+off page        	      	^
+     00205 2773 
+  24 00206 7402 	hlt 		/ Halt program
+  25            	isz E 		/ increment E
+off page        	      	^
+     00207 2772 
+  26            	isz F 		/ increment F
+off page        	      	^
+     00210 2771 
+  27            	dca	G		/ clear accumulator
+off page        	   	 	^
+     00211 3774 
+  28 00212 5200 	jmp Main	/ To continue - goto Main
+  29            /
+  30            / Data Section
+  31            /
+  32 00371 7023 *0750 			/ place data at address 0750 = 0x1E8
+     00372 4306 
+     00373 4305 
+     00374 7024 
+     00375 4304 
+     00376 0751 
+     00377 0750 
+  33 00750 0007 A, 	7 			/ A equals 7
+  34 00751 0134 B, 	134 		/ B equals 92
+  35            *4304			/ place data at address 0x8C4
+  36 04304 0000 C, 	0			/ C equals 0
+  37 04305 7777 D,  7777		/ D equals -1
+  38 04306 4000 E,  4000		/ E equals -2048
+  39            *7023			/ place data at address 0xE13
+  40 07023 3777 F,  3777		/ F equals 2047
+  41 07024 0000 G,  0			/ G is just a place holder for storing accumulator value later.
+  42            $Main 			/ End of Program; Main is entry point
