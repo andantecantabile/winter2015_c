@@ -34,6 +34,8 @@
 #define BUTTON_IMG_FILE_DEFAULT "img_gtk-clear-rec-22.png"
 #define BUTTON_IMG_FILE_RED "img_gtk-media-rec-22.png"
 #define BUTTON_IMG_FILE_TEAL "img_gtk-teal-rec-22.png"
+#define BUTTON_IMG_FILE_SM_DEF "img_gtk-clear-rec-22.png"
+#define BUTTON_IMG_FILE_SM_TEAL "img_gtk-teal-rec-22.png"
 //---------------------------	
 // END PARAMETER SECTION
 //=========================================================
@@ -87,6 +89,14 @@ typedef struct _gtkRegisterValues
 	GtkWidget *label_SR_octal;
 } gtkRegisterValues;
 
+typedef struct _gtkSRBit
+{
+	GtkWidget *label_SR_bit;
+	GtkWidget *button_set;
+	GtkWidget *button_image;
+	GtkWidget *button_label;
+} gtkSRBit;
+
 // Function Prototypes
 void clear_stats();
 void init_trace_files();
@@ -94,6 +104,7 @@ void init_debug_strings();
 void execute_instructions();
 void display_memory_array( s_mem_word* ptr_mem_array, GtkWidget* vtable);
 void display_reg_values();
+void display_SR_bit_values();
 void print_statistics();
 
 //------------------------------------
@@ -111,6 +122,7 @@ s_mem_word mem_array [PDP8_MEMSIZE]; // Memory Space
 // - Memory Display Array for the GUI
 gtkMemoryLine mem_image[PDP8_MEMSIZE];  // would potentially need as many lines 
 								// as there are in the PDP-8 memory.
+gtkSRBit gui_SR_bits[PDP8_WORD_SIZE]; // gui objects for SR bits
 
 // - Debug and Branch statistics
 s_debug_flags debug;				// Debug Flags
@@ -128,7 +140,7 @@ char curr_opcode = 0;	// Current Opcode = IR[0:2]
 char reg_LR = 0;		// Link Register [0] (One bit only!)
 short int reg_AC = 0;	// Accumulator [0:11]
 short int reg_SR = 0;	// Console Switch Register [0:11]
-binary_reg reg_SR_binary;
+int reg_SR_binary[PDP8_WORD_SIZE];
 short int next_PC = 0;
 short int next_AC = 0;	
 short int next_LR = 0;
@@ -168,7 +180,7 @@ GtkWidget *vtable_mem;	// table used inside the scrolled window to align element
 	// on each row of the memory array
 GtkToolItem *toolitem_start;	// tool bar buttons
 GtkToolItem *toolitem_step;
-GtkToolItem *toolitem_restart;
+static GtkToolItem *toolitem_restart;
 int curr_mem_rows;	// number of memory array rows currently being displayed.
 // - GUI COLORS - RGBA
 // These are used on each redraw of the memory table display.
@@ -179,6 +191,7 @@ GdkColor color_read;
 GdkColor color_write;
 GdkColor color_original_bg;
 GdkColor color_default_bg;
+GdkColor color_btn_select;
 // END VARIABLES
 //-------------------------------------
 
@@ -287,9 +300,61 @@ void toggle_breakpoint_button_callback (GtkWidget *widget, gpointer data)
 
 }
 
+// Function to be executed when a toggle SR button has been clicked
+void toggle_SR_bit_button_callback(GtkWidget *widget, gpointer data)
+{
+	int i;
+	char buffer[20];	// temp buffer string
+	
+	// get the button label data
+	strncpy(buffer,(char *) gtk_label_get_text((GtkLabel*) data),8);
+	
+	// convert to int
+	i = atoi(buffer);
+	
+	//fprintf(stderr,"clicked button #%s: %d\n",buffer, i);
+	//fprintf(stderr," SR[%d]: %d\n",i, reg_SR_binary[i]);
+	
+	// check what the current SR bit value is, and switch the value
+	if (reg_SR_binary[i])
+	{	// if it was on, turn it off
+		reg_SR_binary[i] = 0;
+		gtk_label_set_text( (GtkLabel*) gui_SR_bits[i].label_SR_bit, "0");
+		
+		// change button image as well
+		gtk_image_set_from_file((GtkImage*) gui_SR_bits[i].button_image, BUTTON_IMG_FILE_SM_DEF);
+		gtk_widget_queue_draw(gui_SR_bits[i].button_image);
+	}
+	else {
+		// else, if it was off, turn it on
+		reg_SR_binary[i] = 1;
+		gtk_label_set_text( (GtkLabel*) gui_SR_bits[i].label_SR_bit, "1");
+		
+		// change button image as well
+		gtk_image_set_from_file((GtkImage*) gui_SR_bits[i].button_image, BUTTON_IMG_FILE_SM_TEAL);
+		gtk_widget_queue_draw(gui_SR_bits[i].button_image);
+	}
+	
+	// recalculate the SR value
+	reg_SR = binary_reg_to_short_int((int*)&reg_SR_binary[0]);
+	
+	// - Redisplay the SR
+	sprintf(buffer,"%04o",reg_SR);
+	gtk_label_set_text( (GtkLabel*) gui_reg_values.label_SR_octal, buffer );
+	sprintf(buffer,"%03x",reg_SR);
+	gtk_label_set_text( (GtkLabel*) gui_reg_values.label_SR_hex, buffer );
+}
+
 // Function to be executed when the step button is clicked
 void gtk_step_clicked(GtkWidget *widget, gpointer data)
 {
+	// disable SR set bit buttons
+	int i = 0;
+	for (i = 0; i < PDP8_WORD_SIZE; i++)
+	{
+		gtk_widget_set_sensitive ((GtkWidget*) gui_SR_bits[i].button_set, FALSE);
+	}
+	
 	// execute the instructions; pass value of true to indicate
 	// that only one instruction should be executed. (STEP mode)
 	execute_instructions(TRUE);
@@ -304,6 +369,13 @@ void gtk_step_clicked(GtkWidget *widget, gpointer data)
 // Function to be executed when the start (continue) button is clicked
 void gtk_start_clicked(GtkWidget *widget, gpointer data)
 {
+	// disable SR set bit buttons
+	int i = 0;
+	for (i = 0; i < PDP8_WORD_SIZE; i++)
+	{
+		gtk_widget_set_sensitive ((GtkWidget*) gui_SR_bits[i].button_set, FALSE);
+	}
+	
 	// execute the instructions; pass value of false to indicate
 	// that instructions should continue to be executed.
 	execute_instructions(FALSE);
@@ -318,6 +390,8 @@ void gtk_start_clicked(GtkWidget *widget, gpointer data)
 // Function to be executed when the restart button is clicked.
 void gtk_restart_clicked(GtkWidget *widget, gpointer data)
 {
+	int i = 0; // loop index
+	
 	// clear the trace files
 	init_trace_files(); 
 	
@@ -367,12 +441,21 @@ void gtk_restart_clicked(GtkWidget *widget, gpointer data)
 	// Display register values
 	display_reg_values();
 	
+	// Display the SR bits
+	display_SR_bit_values();
+	
 	// disable the restart button
 	gtk_widget_set_sensitive ((GtkWidget*) toolitem_restart, FALSE);
 	
 	// enable the start and step button
 	gtk_widget_set_sensitive ((GtkWidget*) toolitem_start, TRUE);
 	gtk_widget_set_sensitive ((GtkWidget*) toolitem_step, TRUE);
+	
+	// enable the SR set buttons
+	for (i = 0; i < PDP8_WORD_SIZE; i++)
+	{
+		gtk_widget_set_sensitive ((GtkWidget*) gui_SR_bits[i].button_set, TRUE);
+	}
 }
 
 // This function was being used to try to obtain the default
@@ -395,6 +478,7 @@ void widget_realized_bg (GtkWidget *widget) {
 int main (int argc, char* argv[])
 {
   int i, j; // loop indices
+  char buffer[20]; // temp string
   
   // CHECK COMMAND LINE ARGUMENTS:
   if (argc < 2) {
@@ -409,12 +493,19 @@ int main (int argc, char* argv[])
   if (argc > 2) reg_SR = atoi(argv[2]); 
   
   // convert to binary
-  short_int_to_binary_reg(reg_SR,&reg_SR_binary);
+  for (i = 0; i < PDP8_WORD_SIZE; i++)
+  {
+	  reg_SR_binary[i]=0;
+  }
+  
+  short_int_to_binary_reg(reg_SR,(int*)&reg_SR_binary[0]);
+  /*
   fprintf(stderr,"reg SR binary: %d %d %d %d %d %d %d %d %d %d %d %d\n",
-	reg_SR_binary.bit[0],reg_SR_binary.bit[1],reg_SR_binary.bit[2],
-	reg_SR_binary.bit[3],reg_SR_binary.bit[4],reg_SR_binary.bit[5],
-	reg_SR_binary.bit[6],reg_SR_binary.bit[7],reg_SR_binary.bit[8],
-	reg_SR_binary.bit[9],reg_SR_binary.bit[10],reg_SR_binary.bit[11]);
+	reg_SR_binary[0],reg_SR_binary[1],reg_SR_binary[2],
+	reg_SR_binary[3],reg_SR_binary[4],reg_SR_binary[5],
+	reg_SR_binary[6],reg_SR_binary[7],reg_SR_binary[8],
+	reg_SR_binary[9],reg_SR_binary[10],reg_SR_binary[11]);
+  */
   
   // INITIALIZE COLORS
   //gboolean res;
@@ -443,12 +534,14 @@ int main (int argc, char* argv[])
   if (gdk_color_parse ("#cc71a9", &color_write) == 0) ; //failed to parse color
   //-- Default BG color
   if (gdk_color_parse ("#d9d7e0", &color_default_bg) == 0) ; //failed to parse color
+  //-- button select color
+  if (gdk_color_parse ("#00f508", &color_btn_select) == 0) ; //failed to parse color
   
   // WINDOW ITEMS
   GtkWidget *window;	// Main Window
   GtkWidget *scrolled_window;	// Scrolled Window to contain memory table
   //GtkWidget *vtable1;
-  GtkWidget *vframe_mem;	// Memory Table 
+  GtkWidget *vframe_mem;	// Memory Frame 
   //GtkWidget *vtable_mem_header;
   GtkWidget *mem_separator;
   GtkWidget *lbl_vtable_mem_header_addr;
@@ -462,6 +555,7 @@ int main (int argc, char* argv[])
   //GtkWidget *vbox2;
   GtkWidget *vbox3;
   GtkWidget *vbox4;
+  GtkWidget *vtable_sr; // SR bit table
   
   // IMAGE ICON ITEMS
   //GtkWidget *image_box;
@@ -506,11 +600,12 @@ int main (int argc, char* argv[])
   GtkWidget *hbox5;
   GtkWidget *hbox6;
   GtkWidget *hbox7;
+  GtkWidget *hbox7b;
   GtkWidget *hbox8;
   GtkWidget *hbox9;
- // GtkWidget *hbox10;
   GtkWidget *hsep1;
   GtkWidget *hsep2;
+  GtkWidget *hsep3;
   GtkWidget *event_box_last_instr;
   GtkWidget *lbl_eb_last_instr;
   GtkWidget *event_box_eaddr_read;
@@ -522,7 +617,6 @@ int main (int argc, char* argv[])
   GtkWidget *event_box_mem_write;
   GtkWidget *lbl_eb_mem_write;
   
-  //char buffer[1024];
   curr_mem_rows = 0; // initialized memory array rows currently displayed to be 0
 
   GtkAccelGroup *accel_group = NULL;
@@ -716,11 +810,18 @@ int main (int argc, char* argv[])
   gtk_widget_show(hbox6);
   gtk_box_pack_start(GTK_BOX(vbox2a), hbox6, TRUE, TRUE, 3);
   
+  // separator
+  hsep2 = gtk_hseparator_new ();
+  gtk_widget_show(hsep2);
+  gtk_box_pack_start(GTK_BOX(vbox2a), hsep2, TRUE, TRUE, 3);
+  
   // Switch Register:
   hbox7 = gtk_hbox_new(FALSE, 0);
   lbl_SR = gtk_label_new("Switch Register (SR): ");
-  gui_reg_values.label_SR_octal = gtk_label_new("");
-  gui_reg_values.label_SR_hex = gtk_label_new("");
+  sprintf(buffer,"%04o",reg_SR);
+  gui_reg_values.label_SR_octal = gtk_label_new(buffer);
+  sprintf(buffer,"%03x",reg_SR);
+  gui_reg_values.label_SR_hex = gtk_label_new(buffer);
   gtk_box_pack_start(GTK_BOX(hbox7), lbl_SR, FALSE, FALSE, 5);
   gtk_box_pack_start(GTK_BOX(hbox7), gui_reg_values.label_SR_octal, FALSE, FALSE, 5);
   gtk_box_pack_end(GTK_BOX(hbox7), gui_reg_values.label_SR_hex, FALSE, FALSE, 5);
@@ -730,10 +831,67 @@ int main (int argc, char* argv[])
   gtk_widget_show(hbox7);
   gtk_box_pack_start(GTK_BOX(vbox2a), hbox7, TRUE, TRUE, 3);
   
+  hbox7b = gtk_hbox_new(FALSE, 0);
+  vtable_sr = gtk_table_new(3, PDP8_WORD_SIZE, FALSE);
+  gtk_table_set_row_spacings(GTK_TABLE(vtable_sr), 1);
+  gtk_table_set_col_spacings(GTK_TABLE(vtable_sr), 1);
+  for (i = 0; i < PDP8_WORD_SIZE; i++)
+  {
+	  // determine which image and label to use for current SR bit
+	  if (reg_SR_binary[i])
+	  {
+		  // create image box with the set teal button
+		  gui_SR_bits[i].button_image = gtk_image_new_from_file(BUTTON_IMG_FILE_SM_TEAL);
+		  // use gtk_image_set_from_file(image) to update
+		  gtk_widget_queue_draw(gui_SR_bits[i].button_image);
+		  // initialize the visible label
+		  sprintf(buffer,"%d",reg_SR_binary[i]);
+		  gui_SR_bits[i].label_SR_bit = gtk_label_new(buffer);
+	  }
+	  else
+	  {
+		  // create image box with the default clear button
+		  gui_SR_bits[i].button_image = gtk_image_new_from_file(BUTTON_IMG_FILE_SM_DEF);
+		  // use gtk_image_set_from_file(image) to update
+		  gtk_widget_queue_draw(gui_SR_bits[i].button_image);
+		  // initialize the visible label
+		  sprintf(buffer,"%d",reg_SR_binary[i]);
+		  gui_SR_bits[i].label_SR_bit = gtk_label_new(buffer);
+	  }
+	  //fprintf(stderr,"bit #%d; %s\n", i, buffer);
+	  
+	  // initialize bit position labels 
+	  sprintf(buffer,"%d",i);
+	  gui_SR_bits[i].button_label = gtk_label_new(buffer);
+	  
+	  //fprintf(stderr,"   position #: %s\n",buffer);
+
+	  // Initialize the toggle button
+	  gui_SR_bits[i].button_set = gtk_button_new(); 
+	  gtk_container_add (GTK_CONTAINER(gui_SR_bits[i].button_set), gui_SR_bits[i].button_image);
+	  
+	  // attach "clicked" signal for toggle button
+	  gtk_signal_connect (GTK_OBJECT (gui_SR_bits[i].button_set), "clicked", GTK_SIGNAL_FUNC (toggle_SR_bit_button_callback), (gpointer) gui_SR_bits[i].button_label);
+	  gtk_widget_show(gui_SR_bits[i].button_image);
+	  gtk_widget_show(gui_SR_bits[i].button_label);
+	  gtk_widget_show(gui_SR_bits[i].button_set);
+	  gtk_widget_show(gui_SR_bits[i].label_SR_bit);
+	  
+	  // attach bit position label, button and visible value label to the table
+	  gtk_table_attach_defaults (GTK_TABLE (vtable_sr), gui_SR_bits[i].button_label, i, i+1, 0, 1);
+	  gtk_table_attach_defaults (GTK_TABLE (vtable_sr), gui_SR_bits[i].button_set, i, i+1, 1, 2);
+	  gtk_table_attach_defaults (GTK_TABLE (vtable_sr), gui_SR_bits[i].label_SR_bit, i, i+1, 2, 3);
+  }
+  
+  gtk_widget_show(vtable_sr);
+  gtk_box_pack_start(GTK_BOX(hbox7b), vtable_sr, TRUE, TRUE, 3);
+  gtk_widget_show(hbox7b);
+  gtk_box_pack_start(GTK_BOX(vbox2a), hbox7b, TRUE, TRUE, 3);
+  
   // separator
-  hsep2 = gtk_hseparator_new ();
-  gtk_widget_show(hsep2);
-  gtk_box_pack_start(GTK_BOX(vbox2a), hsep2, TRUE, TRUE, 3);
+  hsep3 = gtk_hseparator_new ();
+  gtk_widget_show(hsep3);
+  gtk_box_pack_start(GTK_BOX(vbox2a), hsep3, TRUE, TRUE, 3);
   
   // Color Legend for the Memory Array Window
   // Header Label for the color legend
@@ -1087,6 +1245,10 @@ void display_reg_values()
 	gtk_label_set_text( (GtkLabel*) gui_reg_values.label_SR_hex, buffer );
 }
 
+void display_SR_bit_values() {
+	
+}
+
 // Display the Memory Table with the current values
 void display_memory_array( s_mem_word* ptr_mem_array, GtkWidget* vtable) {
 	int i;	// mem_array index
@@ -1277,9 +1439,6 @@ void execute_instructions(int flag_step)
 {
 	char buffer[512]; // temp buffer for formatting string for IR binary
 	
-	// enable the restart button
-	gtk_widget_set_sensitive ((GtkWidget*) toolitem_restart, TRUE);
-	
 	// Initialize and allocate space for debug print strings
 	char* curr_opcode_str = malloc((DEBUG_STR_LEN*sizeof(char))+1);
 	if (curr_opcode_str == NULL) {
@@ -1347,6 +1506,8 @@ void execute_instructions(int flag_step)
 		exit(-1);
 	}
 	
+	// enable the restart button
+	gtk_widget_set_sensitive ((GtkWidget*) toolitem_restart, TRUE);
 	
 	// initialize breakpoint flag to FALSE.
 	int flag_break = 0;

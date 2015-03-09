@@ -162,10 +162,6 @@ typedef struct _gui_instr_vals {
 	char IR_detail[MAX_IR_DETAIL];	// has the detailed IR view
 } guiInstrVals;
 
-typedef struct _binary_reg {
-	char bit[PDP8_WORD_MAX_BIT_INDEX];
-} binary_reg;
-
 //---------------------------	
 // END STRUCT DEFINITIONS
 //=========================================================
@@ -219,38 +215,44 @@ void int_to_binary_str(int x, int max_digits, char* str_binary[])
 	}
 }
 
-void short_int_to_binary_reg(short int reg, binary_reg* binary_st)
+void short_int_to_binary_reg(short int reg, int* binary_st)
 {
 	int i;
 	//int j = PDP8_WORD_SIZE - 1;
 	int y = 1 << (PDP8_WORD_SIZE-1);
+	//int bit_mask = 1;
 
 	for (i = 0; i < PDP8_WORD_SIZE; i++)
 	{
 		//fprintf(stderr,"i: %d; y: %x\n",i, y);
 		//fprintf(stderr,"reg & y: %x\n",(reg & y));
 		if ((reg & y) == y) {
-			binary_st->bit[i] = 1;
+			*(binary_st+i) = 1;
 		}
 		else {
-			binary_st->bit[i] = 0;
+			*(binary_st+i) = 0;
 		}
 		y = y >> 1;
 	}
 	
 }
 
-short int binary_reg_to_short_int(binary_reg binary_st)
+short int binary_reg_to_short_int(int* binary_st)
 {
 	short int result = 0;
 	int i = 0;
 	int m = 1;
+	short int word_mask = (1 << PDP8_WORD_SIZE) - 1;
 	
-	for (i = 0; i < PDP8_WORD_SIZE; i++)
+	for (i = (PDP8_WORD_MAX_BIT_INDEX); i >= 0; i--)
 	{
-		result = result + (binary_st.bit[i])*m;
+		result = result + (*(binary_st+i))*m;
 		m = m * 2;
 	}
+	
+	result = (result & word_mask);
+	
+	//printf("updated SR: %x\n", result);
 	
 	return result;
 }
