@@ -128,6 +128,7 @@ char curr_opcode = 0;	// Current Opcode = IR[0:2]
 char reg_LR = 0;		// Link Register [0] (One bit only!)
 short int reg_AC = 0;	// Accumulator [0:11]
 short int reg_SR = 0;	// Console Switch Register [0:11]
+binary_reg reg_SR_binary;
 short int next_PC = 0;
 short int next_AC = 0;	
 short int next_LR = 0;
@@ -401,6 +402,19 @@ int main (int argc, char* argv[])
   fprintf (stderr, "Usage: <command> <inputfile> <switch_register>\n");
   exit (1);
   }
+  
+  // store input filename
+  input_filename = argv[1];
+  // if more than 2 arguments given, third argument is the Switch Register value
+  if (argc > 2) reg_SR = atoi(argv[2]); 
+  
+  // convert to binary
+  short_int_to_binary_reg(reg_SR,&reg_SR_binary);
+  fprintf(stderr,"reg SR binary: %d %d %d %d %d %d %d %d %d %d %d %d\n",
+	reg_SR_binary.bit[0],reg_SR_binary.bit[1],reg_SR_binary.bit[2],
+	reg_SR_binary.bit[3],reg_SR_binary.bit[4],reg_SR_binary.bit[5],
+	reg_SR_binary.bit[6],reg_SR_binary.bit[7],reg_SR_binary.bit[8],
+	reg_SR_binary.bit[9],reg_SR_binary.bit[10],reg_SR_binary.bit[11]);
   
   // INITIALIZE COLORS
   //gboolean res;
@@ -977,10 +991,6 @@ int main (int argc, char* argv[])
   g_signal_connect(G_OBJECT(toolitem_restart), "clicked", GTK_SIGNAL_FUNC(gtk_restart_clicked), NULL);
   // connect to capture original background color
   g_signal_connect (mem_image[0].event_box[0], "realize", G_CALLBACK (widget_realized_bg), NULL);
-  // store input filename
-  input_filename = argv[1];
-  // if more than 2 arguments given, third argument is the Switch Register value
-  if (argc > 2) reg_SR = atoi(argv[2]); 
   
   // - Debug Print Strings:
   // - Debug Flags:

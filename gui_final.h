@@ -44,6 +44,7 @@
 #define PDP8_ADDR_SIZE 12	// size of address in bits, hard-coded
 #define PDP8_LR_SIZE 1		// size of the Link Register
 #define WORD_STRING_SIZE (PDP8_WORD_SIZE+1)
+#define PDP8_WORD_MAX_BIT_INDEX PDP8_WORD_SIZE-1
 // Note that addresses are specified with the bits numbered as follows:
 //  <    p  a  g  e    > <     o  f  f  s  e  t     >
 //  |___|___|___|___|___|___|___|___|___|___|___|___|
@@ -161,6 +162,10 @@ typedef struct _gui_instr_vals {
 	char IR_detail[MAX_IR_DETAIL];	// has the detailed IR view
 } guiInstrVals;
 
+typedef struct _binary_reg {
+	char bit[PDP8_WORD_MAX_BIT_INDEX];
+} binary_reg;
+
 //---------------------------	
 // END STRUCT DEFINITIONS
 //=========================================================
@@ -214,6 +219,41 @@ void int_to_binary_str(int x, int max_digits, char* str_binary[])
 	}
 }
 
+void short_int_to_binary_reg(short int reg, binary_reg* binary_st)
+{
+	int i;
+	//int j = PDP8_WORD_SIZE - 1;
+	int y = 1 << (PDP8_WORD_SIZE-1);
+
+	for (i = 0; i < PDP8_WORD_SIZE; i++)
+	{
+		//fprintf(stderr,"i: %d; y: %x\n",i, y);
+		//fprintf(stderr,"reg & y: %x\n",(reg & y));
+		if ((reg & y) == y) {
+			binary_st->bit[i] = 1;
+		}
+		else {
+			binary_st->bit[i] = 0;
+		}
+		y = y >> 1;
+	}
+	
+}
+
+short int binary_reg_to_short_int(binary_reg binary_st)
+{
+	short int result = 0;
+	int i = 0;
+	int m = 1;
+	
+	for (i = 0; i < PDP8_WORD_SIZE; i++)
+	{
+		result = result + (binary_st.bit[i])*m;
+		m = m * 2;
+	}
+	
+	return result;
+}
 
 //=========================================================
 // FUNCTION NAME: load_memory_array
