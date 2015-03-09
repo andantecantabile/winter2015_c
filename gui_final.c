@@ -1330,8 +1330,6 @@ void display_memory_array( s_mem_word* ptr_mem_array, GtkWidget* vtable) {
 			}
 			gtk_widget_show (mem_image[k].button_breakpoint);
 			gtk_widget_show (mem_image[k].button_image);
-			//gtk_widget_show (mem_image[k].label_addr);
-			//gtk_widget_show (mem_image[k].label_value);
 			gtk_widget_show (mem_image[k].label_addr_octal);
 			gtk_widget_show (mem_image[k].label_addr_hex);
 			gtk_widget_show (mem_image[k].label_value_octal);
@@ -1399,6 +1397,22 @@ void display_memory_array( s_mem_word* ptr_mem_array, GtkWidget* vtable) {
 			
 			k++; // increment the display index
 		}
+	}
+	
+	// if there are extra existing rows remaining, hide them
+	while (k <=(curr_mem_rows+2))
+	{	
+		//fprintf(stderr,"k: %d; curr_mem_rows+2: %d\n",k,(curr_mem_rows+2));
+		gtk_widget_hide (mem_image[k].button_breakpoint);
+		gtk_widget_hide (mem_image[k].button_image);
+		gtk_widget_hide (mem_image[k].label_addr_octal);
+		gtk_widget_hide (mem_image[k].label_addr_hex);
+		gtk_widget_hide (mem_image[k].label_value_octal);
+		gtk_widget_hide (mem_image[k].label_value_hex);
+		for (j = 0; j < 6; j++) {
+			gtk_widget_hide (mem_image[k].event_box[j]);
+		}
+		k++;
 	}
 	
 	// Resize table finally [rows, cols]
@@ -1511,12 +1525,6 @@ void execute_instructions(int flag_step)
 	
 	// initialize breakpoint flag to FALSE.
 	int flag_break = 0;
-	
-	// clear read/write index data; set it out of range of the memory array indices
-	gui_last_instr.index_read = PDP8_MEMSIZE+1;
-	gui_last_instr.index_write = PDP8_MEMSIZE+1;
-	gui_last_instr.index_eaddr_read = PDP8_MEMSIZE+1;
-	gui_last_instr.index_eaddr_write = PDP8_MEMSIZE+1;
 
 	// Open the trace and branch trace files.
 	if ((fp_tracefile = fopen(trace_filename, "a")) == NULL) {
@@ -1532,6 +1540,12 @@ void execute_instructions(int flag_step)
 	//======================================================
 	// MAIN LOOP
 	do {
+		// clear read/write index data; set it out of range of the memory array indices
+		gui_last_instr.index_read = PDP8_MEMSIZE+1;
+		gui_last_instr.index_write = PDP8_MEMSIZE+1;
+		gui_last_instr.index_eaddr_read = PDP8_MEMSIZE+1;
+		gui_last_instr.index_eaddr_write = PDP8_MEMSIZE+1;
+	
 		//counter++;
 		effective_address = 0;
 		memval_eaddr = 0;
